@@ -1,9 +1,13 @@
+import { requireAdminApi } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
+  const denied = await requireAdminApi();
+  if (denied) return denied;
+
   const format = req.nextUrl.searchParams.get('format') || 'csv';
 
   const sampleData = [

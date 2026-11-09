@@ -1,7 +1,11 @@
+import { requireAdminApi } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { processTelegramPost } from '@/lib/telegram/service';
 
 export async function POST(req: NextRequest) {
+  const denied = await requireAdminApi();
+  if (denied) return denied;
+
   try {
     const { messageText, channelName = 'SimpleXplore Deals Channel' } = await req.json();
 

@@ -2,32 +2,77 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-display: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-padding-top: 7rem;
+  }
+
+  body {
+    color: #202820;
+    background-color: #F7F9F7;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  ::selection {
+    background: var(--brand-200, #B8E3C6);
+    color: #0F1F15;
+  }
+
+  /* One consistent, visible focus ring for keyboard users. */
+  :focus-visible {
+    outline: 2px solid var(--brand-500, #168A45);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
 }
 
-body {
-  color: #202820;
-  background-color: #F7F9F7;
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@layer utilities {
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
 }
 
-/* Custom scrollbar */
+/* CSS transitions also respect reduced motion (Framer Motion handles its own via MotionConfig). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 ::-webkit-scrollbar-track {
-  background: #F1F4F1;
+  background: #EEF3EF;
 }
 ::-webkit-scrollbar-thumb {
   background: #C4D1C4;
-  border-radius: 4px;
+  border-radius: 999px;
+  border: 2px solid #EEF3EF;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #168A45;
+  background: #86CEA1;
 }
-

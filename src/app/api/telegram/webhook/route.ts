@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TelegramWebhookUpdate, processTelegramPost } from '@/lib/telegram/service';
+import { safeEqual } from '@/lib/admin-session';
 
 // In-memory set of processed update IDs to ensure strict idempotency
 const processedUpdateIds = new Set<number>();
@@ -10,7 +11,12 @@ export async function POST(req: NextRequest) {
     const configuredSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
     const incomingSecret = req.headers.get('x-telegram-bot-api-secret-token');
 
-    if (configuredSecret && incomingSecret !== configuredSecret) {
+    // Fail closed: without a configured secret anyone could inject "posts".
+    if (!configuredSecret) {
+      console.error('TELEGRAM_WEBHOOK_SECRET is not configured; rejecting webhook call.');
+      return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 });
+    }
+    if (!incomingSecret || !safeEqual(incomingSecret, configuredSecret)) {
       console.warn('Unauthorized Telegram webhook attempt: secret token mismatch');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { isSafeExternalUrl } from '@/lib/utils/ssrf';
+import { getAdminSession } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,7 +9,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const productId = params.id;
   const product = await db.getProductById(productId);
 
-  if (!product || !product.affiliate_url) {
+  // Drafts and archived products are never publicly redirectable (admin previews excepted).
+  const isPublic = product?.status === 'published';
+  if (!product || !product.affiliate_url || (!isPublic && !(await getAdminSession()))) {
     return NextResponse.redirect(new URL('/products', req.url));
   }
 
@@ -17,7 +20,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const userAgent = req.headers.get('user-agent') || undefined;
   const urlObj = new URL(req.url);
   const campaign = urlObj.searchParams.get('utm_campaign') || urlObj.searchParams.get('ref') || 'direct';
-  const sessionId = req.cookies.get('sx_session')?.value || `sess_${Math.random().toString(36).substring(2, 10)}`;
+  const sessionId = req.cookies.get('sx_session')?.value || `sess_${crypto.randomUUID()}`;
 
   // Record click asynchronously
   try {

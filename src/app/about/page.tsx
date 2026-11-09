@@ -3,7 +3,10 @@ import Link from 'next/link';
 import { Sparkles, ShieldCheck, Zap, ArrowRight } from 'lucide-react';
 
 export const metadata = {
-  title: 'About Us | SimpleXplore',
+  alternates: { canonical: '/about' },
+  title: 'About Us',
+  description:
+    'SimpleXplore is an India-focused product discovery site that handpicks products and price drops from Amazon, Flipkart, Myntra and other trusted retailers.',
 };
 
 export default function AboutPage() {

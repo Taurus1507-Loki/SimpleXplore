@@ -71,17 +71,31 @@ SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 TELEGRAM_BOT_TOKEN=your-telegram-bot-token
 TELEGRAM_WEBHOOK_SECRET=your-random-webhook-secret
-ADMIN_EMAIL=simplore01@gmail.com
+ADMIN_EMAIL=admin@your-domain.com
+ADMIN_PASSWORD=long-random-password         # demo mode only
+ADMIN_SESSION_SECRET=at-least-32-random-chars  # signs the admin session cookie
 NEXT_PUBLIC_DEMO_MODE=true
 ```
 *(Note: With `NEXT_PUBLIC_DEMO_MODE=true`, SimpleXplore runs with full mock fixtures out of the box so you can test all features immediately!)*
 
 ### 3. Run Supabase Database Migration
-When connecting your live Supabase project, run the complete migration script located at:
+When connecting your live Supabase project, run the migrations in order:
 ```bash
 supabase/migrations/001_initial_schema.sql
+supabase/migrations/002_harden_admin_roles.sql
 ```
-This initializes all 13 tables, indexes, triggers, seed categories, and Row Level Security (RLS) policies.
+This initializes all tables, indexes, triggers, seed categories, and Row Level Security (RLS) policies. Migration 002 stops customers from changing their own role and makes every new sign-up a customer.
+
+### Admin account
+There is exactly one administrator and no public admin sign-up.
+
+- **Demo mode (no Supabase):** sign in at `/login` with `ADMIN_EMAIL` + `ADMIN_PASSWORD`.
+- **Live mode (Supabase):** create the account in Supabase Auth, then grant the role once from the SQL editor:
+  ```sql
+  update public.profiles set role = 'admin' where email = 'admin@your-domain.com';
+  ```
+
+On success the server sets a signed, httpOnly `sx_admin_session` cookie (HMAC-SHA256 with `ADMIN_SESSION_SECRET`, 8-hour expiry). Middleware and every `/api/admin/*` handler verify it server-side.
 
 ### 4. Start Development Server
 ```bash
@@ -164,9 +178,19 @@ All 9 critical test suites pass out-of-the-box:
 
 - [x] Server-side secret isolation: `SUPABASE_SERVICE_ROLE_KEY` and `TELEGRAM_BOT_TOKEN` are never bundled in client code.
 - [x] SSRF guard (`isSafeExternalUrl`) blocks localhost, private IPv4/IPv6, and cloud metadata (`169.254.169.254`).
-- [x] Webhook authenticity verified via `x-telegram-bot-api-secret-token`.
+- [x] Webhook authenticity verified via `x-telegram-bot-api-secret-token` (constant-time compare; rejected when the secret is unset).
+- [x] Admin access via a signed httpOnly session cookie, enforced in middleware and in every admin API handler; login is rate-limited.
+- [x] Draft products are never publicly viewable or redirectable; the admin gets a noindex preview.
+- [x] JSON-LD output is escaped against script injection from untrusted product text.
 - [x] Idempotent Telegram update handler preventing duplicate processing.
 - [x] Outbound affiliate links redirect with `302`, `X-Robots-Tag: noindex, nofollow`, and `rel="nofollow sponsored"`.
 - [x] Customer wishlist isolation via private user IDs and Row Level Security.
-- [x] Static and dynamic route compilation verified: 34/34 pages passing Next.js production build.
+
+## 🔎 SEO
+
+- Per-page titles, descriptions and canonical URLs; filtered/search catalog URLs are `noindex` and canonicalize to `/products`.
+- Structured data: Organization, WebSite (with SearchAction), BreadcrumbList, ItemList on listing pages, and Product — offers and ratings only when the data is actually stored (no invented availability or review counts).
+- `/sitemap.xml` (published products only), `/robots.txt`, web manifest, SVG icon and a generated Open Graph image.
+- Self-hosted fonts via `next/font`, optimized images via `next/image`; the hero headline is never rendered at opacity 0 (protects LCP).
+- Set `NEXT_PUBLIC_SITE_URL` to your production domain so canonicals and the sitemap use it.
 

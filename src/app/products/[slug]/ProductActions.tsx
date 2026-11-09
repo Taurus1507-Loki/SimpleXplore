@@ -42,9 +42,10 @@ export default function ProductActions({ product }: ProductActionsProps) {
         href={`/r/${product.id}`}
         target="_blank"
         rel="nofollow sponsored noopener"
-        className="flex-1 inline-flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 active:scale-[0.98] text-white font-bold text-sm py-3.5 px-6 rounded-2xl shadow-md hover:shadow-card-hover transition-all"
+        className="flex-1 inline-flex min-h-[52px] items-center justify-center gap-2 bg-brand-600 hover:bg-brand-700 active:scale-[0.98] text-white font-semibold text-base py-3.5 px-6 rounded-2xl shadow-soft-md transition-all"
       >
         <span>Buy on {product.retailer}</span>
+        <span className="sr-only">(opens in new tab)</span>
         <ExternalLink className="w-4 h-4 opacity-90" />
       </a>
 
@@ -52,13 +53,14 @@ export default function ProductActions({ product }: ProductActionsProps) {
       <button
         type="button"
         onClick={() => toggleWishlist(product)}
+        aria-pressed={wishlisted}
         className={`inline-flex items-center justify-center gap-2 py-3.5 px-5 rounded-2xl border text-xs font-semibold transition-all ${
           wishlisted
-            ? 'bg-rose-50 border-rose-200 text-rose-600'
+            ? 'bg-red-50 border-red-200 text-red-700'
             : 'bg-white border-surface-border text-copy-primary hover:bg-surface-bg hover:border-brand-300'
         }`}
       >
-        <Heart className={`w-4 h-4 ${wishlisted ? 'fill-rose-500 text-rose-500' : 'text-copy-secondary'}`} />
+        <Heart className={`w-4 h-4 ${wishlisted ? 'fill-red-600 text-red-600' : 'text-copy-secondary'}`} />
         <span>{wishlisted ? 'Saved in Wishlist' : 'Add to Wishlist'}</span>
       </button>
 
@@ -67,7 +69,7 @@ export default function ProductActions({ product }: ProductActionsProps) {
         type="button"
         onClick={handleShare}
         className="inline-flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl border border-surface-border bg-white text-copy-secondary hover:bg-surface-bg hover:text-copy-primary text-xs font-medium transition-all"
-        title="Share this deal"
+        aria-label="Share this product"
       >
         {copied ? (
           <>

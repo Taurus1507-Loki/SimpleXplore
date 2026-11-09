@@ -156,7 +156,7 @@ export default function ProductCatalogClient({
             <button
               type="button"
               onClick={handleResetFilters}
-              className="text-xs font-semibold text-rose-600 hover:underline flex items-center gap-1 ml-2"
+              className="text-xs font-semibold text-red-700 hover:underline flex items-center gap-1 ml-2"
             >
               <RotateCcw className="w-3 h-3" />
               <span>Reset</span>
@@ -198,7 +198,7 @@ export default function ProductCatalogClient({
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className="text-[11px] font-semibold text-rose-600 hover:underline"
+                className="text-[11px] font-semibold text-red-700 hover:underline"
               >
                 Clear all
               </button>
@@ -386,7 +386,7 @@ export default function ProductCatalogClient({
                   onClick={() => setMinRating(stars)}
                   className={`w-full text-left px-2.5 py-1.5 rounded-lg font-medium transition-colors flex items-center justify-between ${
                     minRating === stars
-                      ? 'bg-amber-50 text-amber-900 font-bold'
+                      ? 'bg-accent-50 text-accent-700 font-bold'
                       : 'text-copy-secondary hover:bg-surface-bg'
                   }`}
                 >
@@ -395,12 +395,12 @@ export default function ProductCatalogClient({
                       <span>All Ratings</span>
                     ) : (
                       <>
-                        <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                        <Star className="w-3.5 h-3.5 fill-accent-400 text-accent-400" />
                         <span>{stars}★ &amp; above</span>
                       </>
                     )}
                   </div>
-                  {minRating === stars && <Check className="w-3.5 h-3.5 text-amber-600" />}
+                  {minRating === stars && <Check className="w-3.5 h-3.5 text-accent-700" />}
                 </button>
               ))}
             </div>
@@ -429,7 +429,7 @@ export default function ProductCatalogClient({
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3">
               {filteredProducts.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}

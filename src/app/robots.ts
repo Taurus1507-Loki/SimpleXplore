@@ -1,19 +1,18 @@
 import { MetadataRoute } from 'next';
-
-export const dynamic = 'force-dynamic';
+import { getSiteUrl } from '@/lib/seo';
 
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+  const baseUrl = getSiteUrl();
 
   return {
     rules: [
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/admin/', '/api/', '/r/', '/login', '/register'],
+        disallow: ['/admin', '/api/', '/r/', '/login', '/register', '/wishlist'],
       },
     ],
     sitemap: `${baseUrl}/sitemap.xml`,
+    host: baseUrl,
   };
 }
-

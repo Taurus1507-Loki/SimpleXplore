@@ -1,6 +1,10 @@
+import { requireAdminApi } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
+  const denied = await requireAdminApi();
+  if (denied) return denied;
+
   try {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     const secret = process.env.TELEGRAM_WEBHOOK_SECRET;

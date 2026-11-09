@@ -1,39 +1,34 @@
 import React from 'react';
+import type { Metadata } from 'next';
 import { db } from '@/lib/db';
 import ProductGrid from '@/components/ProductGrid';
-import { Flame } from 'lucide-react';
+import PageHeader from '@/components/PageHeader';
+import JsonLd from '@/components/JsonLd';
+import { itemListJsonLd } from '@/lib/seo';
 
 export const dynamic = 'force-dynamic';
 
+export const metadata: Metadata = {
+  title: 'Trending products in India right now',
+  description:
+    'Popular products shoppers are checking out this week — fashion, electronics, beauty and home finds, handpicked by the SimpleXplore team.',
+  alternates: { canonical: '/trending' },
+};
+
 export default async function TrendingPage() {
-  const { products } = await db.getProducts({
-    status: 'published',
-    isTrending: true,
-    sort: 'newest',
-  });
+  const { products } = await db.getProducts({ status: 'published', isTrending: true, sort: 'newest' });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-      <div className="bg-gradient-to-r from-rose-500/10 via-brand-50 to-amber-50/50 p-6 sm:p-8 rounded-3xl border border-rose-200/60">
-        <div className="max-w-2xl space-y-2">
-          <div className="inline-flex items-center gap-1.5 bg-rose-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-sm">
-            <Flame className="w-3.5 h-3.5" />
-            <span>Trending Products</span>
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold font-display text-copy-primary">
-            Popular & Viral Shopping Finds
-          </h1>
-          <p className="text-sm text-copy-secondary">
-            The most clicked, saved, and highly rated products currently trending in India.
-          </p>
-        </div>
-      </div>
-
-      <ProductGrid 
-        products={products} 
-        emptyMessage="No trending products listed right now." 
+    <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+      {products.length > 0 && <JsonLd data={itemListJsonLd('Trending products', products)} />}
+      <PageHeader
+        crumbs={[{ name: 'Trending', path: '/trending' }]}
+        eyebrow="Popular this week"
+        title="Trending right now"
+        description="Products our team has flagged as popular with shoppers across India."
+        meta={products.length > 0 ? `${products.length} products` : undefined}
       />
+      <ProductGrid products={products} priorityCount={4} emptyMessage="No trending products listed right now." />
     </div>
   );
 }
-

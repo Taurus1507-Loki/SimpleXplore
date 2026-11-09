@@ -1,8 +1,12 @@
+import { requireAdminApi } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { slugify } from '@/lib/utils/slugify';
 
 export async function POST(req: NextRequest) {
+  const denied = await requireAdminApi();
+  if (denied) return denied;
+
   try {
     const data = await req.json();
 
@@ -27,6 +31,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const denied = await requireAdminApi();
+  if (denied) return denied;
+
   try {
     const data = await req.json();
     if (!data.id) {
@@ -42,6 +49,9 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const denied = await requireAdminApi();
+  if (denied) return denied;
+
   try {
     const id = req.nextUrl.searchParams.get('id');
     const clearDefaults = req.nextUrl.searchParams.get('clearDefaults') === 'true';

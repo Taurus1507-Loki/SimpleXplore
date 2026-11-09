@@ -1,7 +1,8 @@
 import React from 'react';
-import Link from 'next/link';
+import type { Metadata } from 'next';
 import { db } from '@/lib/db';
 import ProductCatalogClient from '@/components/ProductCatalogClient';
+import PageHeader from '@/components/PageHeader';
 
 interface ProductsPageProps {
   searchParams: {
@@ -15,42 +16,43 @@ interface ProductsPageProps {
 
 export const dynamic = 'force-dynamic';
 
+export async function generateMetadata({ searchParams }: ProductsPageProps): Promise<Metadata> {
+  const filtered = Boolean(
+    searchParams.search || searchParams.category || searchParams.retailer || searchParams.sort || searchParams.featured
+  );
+  const title = searchParams.search ? `Search results for “${searchParams.search}”` : 'All products & deals';
+  return {
+    title,
+    description:
+      'Browse every product on SimpleXplore — filter by category, retailer, price and discount to find the best deal from top Indian stores.',
+    // Filtered/search URLs consolidate to the main catalog and stay out of the index.
+    alternates: { canonical: '/products' },
+    robots: filtered ? { index: false, follow: true } : undefined,
+  };
+}
+
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
-  const categories = await db.getCategories();
-  const categorySlug = searchParams.category;
-  const retailer = searchParams.retailer;
-  const search = searchParams.search;
+  const [categories, { products }] = await Promise.all([
+    db.getCategories(),
+    db.getProducts({ status: 'published' }),
+  ]);
 
-  // Retrieve published products
-  const { products } = await db.getProducts({
-    status: 'published',
-  });
-
-  const activeCategory = categorySlug ? categories.find(c => c.slug === categorySlug) : null;
+  const { category: categorySlug, retailer, search } = searchParams;
+  const activeCategory = categorySlug ? categories.find((c) => c.slug === categorySlug) : null;
+  const title = activeCategory ? activeCategory.name : search ? `Results for “${search}”` : 'All products';
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      {/* Breadcrumbs */}
-      <div className="text-xs text-copy-muted flex items-center gap-1.5">
-        <Link href="/" className="hover:text-brand-600">Home</Link>
-        <span>/</span>
-        <span className="text-copy-primary font-medium">
-          {activeCategory ? activeCategory.name : search ? `Search: "${search}"` : 'All Products'}
-        </span>
-      </div>
+    <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+      <PageHeader
+        crumbs={[{ name: 'Products', path: '/products' }]}
+        eyebrow="Catalog"
+        title={title}
+        description="Handpicked products from India's leading online stores. Filter by category, retailer, price or discount."
+      />
 
-      {/* Page Title */}
-      <div>
-        <h1 className="text-3xl font-extrabold font-display text-copy-primary">
-          {activeCategory ? activeCategory.name : search ? `Search Results for "${search}"` : 'Explore Products & Verified Deals'}
-        </h1>
-        <p className="text-xs text-copy-secondary mt-1">
-          Hand-screened discounts and top deals across India&apos;s leading online stores
-        </p>
-      </div>
-
-      {/* Interactive Catalog Client with dynamic filters & price slider */}
+      {/* Keyed so a new header search or category link resets the client-side filters. */}
       <ProductCatalogClient
+        key={`${search ?? ''}|${categorySlug ?? ''}|${retailer ?? ''}`}
         initialProducts={products}
         categories={categories}
         initialCategorySlug={categorySlug}

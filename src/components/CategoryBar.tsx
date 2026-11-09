@@ -2,57 +2,51 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Category } from '@/types';
+import SectionHeader from './SectionHeader';
+import { Reveal } from './motion/Reveal';
 
 interface CategoryBarProps {
   categories: Category[];
 }
 
 export default function CategoryBar({ categories }: CategoryBarProps) {
-  return (
-    <div className="py-8 bg-white border-b border-surface-border/60">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-xl font-bold font-display text-copy-primary">
-              Popular Categories
-            </h2>
-            <p className="text-xs text-copy-secondary">
-              Browse top deals curated by department
-            </p>
-          </div>
-          <Link
-            href="/categories"
-            className="text-xs font-semibold text-brand-600 hover:text-brand-700 hover:underline"
-          >
-            View All Categories →
-          </Link>
-        </div>
+  if (categories.length === 0) return null;
 
-        {/* Scrollable / Responsive grid */}
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-9 gap-3">
+  return (
+    <section aria-labelledby="categories-title" className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <Reveal>
+        <SectionHeader
+          id="categories-title"
+          eyebrow="Shop by category"
+          title="Find your next favourite"
+          href="/categories"
+          linkLabel="All categories"
+        />
+        {/* Scroll-snap row on phones, full grid on larger screens. */}
+        <ul className="no-scrollbar -mx-4 mt-6 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-5 sm:overflow-visible sm:px-0 lg:grid-cols-9">
           {categories.map((cat) => (
-            <Link
-              key={cat.id}
-              href={`/categories/${cat.slug}`}
-              className="group flex flex-col items-center text-center p-2.5 rounded-2xl hover:bg-brand-50/70 border border-transparent hover:border-brand-200 transition-all duration-200"
-            >
-              <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden mb-2 bg-[#F3F5F3] border border-surface-border group-hover:scale-105 transition-transform shadow-soft-sm">
-                <Image
-                  src={cat.image || 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=200'}
-                  alt={cat.name}
-                  fill
-                  sizes="64px"
-                  className="object-cover"
-                />
-              </div>
-              <span className="text-xs font-medium text-copy-primary group-hover:text-brand-700 line-clamp-1">
-                {cat.name}
-              </span>
-            </Link>
+            <li key={cat.id} className="w-[6.5rem] shrink-0 snap-start sm:w-auto">
+              <Link
+                href={`/categories/${cat.slug}`}
+                className="group flex flex-col items-center gap-2.5 rounded-2xl p-2 text-center transition-colors hover:bg-white"
+              >
+                <span className="relative block aspect-square w-full overflow-hidden rounded-2xl bg-surface-muted ring-1 ring-surface-border transition-shadow group-hover:shadow-soft-md">
+                  <Image
+                    src={cat.image || 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=300'}
+                    alt=""
+                    fill
+                    sizes="(max-width: 640px) 104px, 140px"
+                    className="object-cover transition-transform duration-500 ease-out-expo group-hover:scale-[1.04]"
+                  />
+                </span>
+                <span className="line-clamp-2 text-xs font-medium leading-tight text-copy-primary group-hover:text-brand-800 sm:text-[0.8125rem]">
+                  {cat.name}
+                </span>
+              </Link>
+            </li>
           ))}
-        </div>
-      </div>
-    </div>
+        </ul>
+      </Reveal>
+    </section>
   );
 }
-

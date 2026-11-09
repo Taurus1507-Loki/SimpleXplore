@@ -1,33 +1,38 @@
 import React from 'react';
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
 import { db } from '@/lib/db';
 import ProductGrid from '@/components/ProductGrid';
-import { ArrowLeft } from 'lucide-react';
+import PageHeader from '@/components/PageHeader';
+import JsonLd from '@/components/JsonLd';
+import { categoryDescription, itemListJsonLd } from '@/lib/seo';
 
 export const dynamic = 'force-dynamic';
 
 interface CategoryDetailPageProps {
-  params: {
-    slug: string;
-  };
+  params: { slug: string };
 }
 
-export async function generateMetadata({ params }: CategoryDetailPageProps) {
+export async function generateMetadata({ params }: CategoryDetailPageProps): Promise<Metadata> {
   const category = await db.getCategoryBySlug(params.slug);
-  if (!category) return { title: 'Category Not Found' };
+  if (!category) return { title: 'Category not found', robots: { index: false, follow: true } };
+  const description = categoryDescription(category);
   return {
-    title: `${category.name} Deals & Products | SimpleXplore`,
-    description: category.description || `Browse the best affiliate deals in ${category.name} on SimpleXplore.`,
+    title: `${category.name} — best deals & products`,
+    description,
+    alternates: { canonical: `/categories/${category.slug}` },
+    openGraph: {
+      title: `${category.name} deals on SimpleXplore`,
+      description,
+      url: `/categories/${category.slug}`,
+      images: category.image ? [{ url: category.image, alt: category.name }] : undefined,
+    },
   };
 }
 
 export default async function CategoryDetailPage({ params }: CategoryDetailPageProps) {
   const category = await db.getCategoryBySlug(params.slug);
-
-  if (!category) {
-    notFound();
-  }
+  if (!category) notFound();
 
   const { products, total } = await db.getProducts({
     status: 'published',
@@ -36,32 +41,23 @@ export default async function CategoryDetailPage({ params }: CategoryDetailPageP
   });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-      {/* Back button and Header */}
-      <div className="space-y-4">
-        <Link
-          href="/categories"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600 hover:text-brand-700"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span>All Categories</span>
-        </Link>
-
-        <div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold font-display text-copy-primary">
-            {category.name}
-          </h1>
-          <p className="text-sm text-copy-secondary mt-1">
-            {category.description || `Explore ${total} top-rated products in ${category.name}`}
-          </p>
-        </div>
-      </div>
-
-      <ProductGrid 
-        products={products} 
-        emptyMessage={`No products currently available in ${category.name}. Check back soon!`}
+    <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+      {products.length > 0 && <JsonLd data={itemListJsonLd(category.name, products)} />}
+      <PageHeader
+        crumbs={[
+          { name: 'Categories', path: '/categories' },
+          { name: category.name, path: `/categories/${category.slug}` },
+        ]}
+        eyebrow="Category"
+        title={category.name}
+        description={categoryDescription(category)}
+        meta={total > 0 ? `${total} ${total === 1 ? 'product' : 'products'}` : undefined}
+      />
+      <ProductGrid
+        products={products}
+        priorityCount={4}
+        emptyMessage={`No products in ${category.name} yet. Check back soon.`}
       />
     </div>
   );
 }
-

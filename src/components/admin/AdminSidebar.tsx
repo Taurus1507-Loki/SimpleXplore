@@ -21,20 +21,14 @@ import {
   Globe,
   ArrowRight
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 
 export default function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
 
   const handleAdminSignOut = async () => {
-    if (typeof document !== 'undefined') {
-      document.cookie = 'sx_admin_demo=; path=/; max-age=0';
-      document.cookie = 'sx_user_email=; path=/; max-age=0';
-    }
     try {
-      const supabase = createClient();
-      await supabase.auth.signOut();
+      await fetch('/api/auth/logout', { method: 'POST' });
     } catch {}
     router.push('/login');
     router.refresh();

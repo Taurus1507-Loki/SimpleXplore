@@ -1,36 +1,44 @@
 import React from 'react';
+import Link from 'next/link';
+import { PackageSearch } from 'lucide-react';
 import { Product } from '@/types';
 import ProductCard from './ProductCard';
 
 interface ProductGridProps {
   products: Product[];
   emptyMessage?: string;
+  /** Mark the first N images as LCP candidates. */
+  priorityCount?: number;
 }
 
 export default function ProductGrid({
   products,
   emptyMessage = 'No products found matching your criteria.',
+  priorityCount = 0,
 }: ProductGridProps) {
   if (!products || products.length === 0) {
     return (
-      <div className="py-16 text-center border-2 border-dashed border-surface-border rounded-2xl bg-white p-8">
-        <div className="w-12 h-12 rounded-full bg-brand-50 text-brand-600 mx-auto flex items-center justify-center font-bold text-lg mb-3">
-          🔍
-        </div>
-        <h4 className="text-base font-semibold text-copy-primary">No products available</h4>
-        <p className="text-sm text-copy-secondary max-w-md mx-auto mt-1">
-          {emptyMessage}
-        </p>
+      <div className="rounded-2xl border border-dashed border-surface-border bg-white px-6 py-16 text-center">
+        <PackageSearch className="mx-auto h-8 w-8 text-brand-600" aria-hidden="true" />
+        <p className="mt-3 font-display text-lg font-semibold text-ink">Nothing here yet</p>
+        <p className="mx-auto mt-1 max-w-md text-sm text-copy-secondary">{emptyMessage}</p>
+        <Link
+          href="/products"
+          className="mt-5 inline-flex min-h-[44px] items-center rounded-xl bg-ink px-5 text-sm font-semibold text-white hover:bg-brand-700"
+        >
+          Browse all products
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+    <ul className="grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
       {products.map((product, idx) => (
-        <ProductCard key={product.id} product={product} priority={idx < 4} />
+        <li key={product.id}>
+          <ProductCard product={product} priority={idx < priorityCount} />
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
-

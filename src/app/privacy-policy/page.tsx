@@ -1,7 +1,8 @@
 import React from 'react';
 
 export const metadata = {
-  title: 'Privacy Policy | SimpleXplore',
+  alternates: { canonical: '/privacy-policy' },
+  title: 'Privacy Policy',
 };
 
 export default function PrivacyPolicyPage() {

@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { ShieldCheck } from 'lucide-react';
 import { ProductImage } from '@/types';
 
 interface ProductImageGalleryProps {
@@ -27,14 +26,14 @@ export default function ProductImageGallery({
   return (
     <div className="space-y-4">
       {/* Main Image View */}
-      <div className="relative aspect-square w-full rounded-2xl bg-[#F8FAF8] border border-surface-border overflow-hidden p-6 flex items-center justify-center">
+      <div className="relative aspect-square w-full rounded-3xl bg-white border border-surface-border overflow-hidden p-6 flex items-center justify-center">
         <Image
           src={activeImage}
           alt={title}
           fill
           priority
           sizes="(max-width: 1024px) 100vw, 40vw"
-          className="object-contain p-4 hover:scale-105 transition-transform duration-300"
+          className="object-contain p-4 transition-transform duration-500 ease-out-expo hover:scale-[1.03]"
         />
       </div>
 
@@ -48,7 +47,9 @@ export default function ProductImageGallery({
                 key={index}
                 type="button"
                 onClick={() => setActiveImage(imgUrl)}
-                className={`relative w-16 h-16 rounded-xl border-2 flex-shrink-0 bg-white overflow-hidden p-1 transition-all ${
+                aria-label={`Show image ${index + 1} of ${allImages.length}`}
+                aria-pressed={isSelected}
+                className={`relative w-16 h-16 min-w-[44px] rounded-xl border-2 flex-shrink-0 bg-white overflow-hidden p-1 transition-all ${
                   isSelected
                     ? 'border-brand-500 shadow-soft-sm scale-105'
                     : 'border-surface-border hover:border-brand-300 opacity-75 hover:opacity-100'
@@ -56,7 +57,8 @@ export default function ProductImageGallery({
               >
                 <Image
                   src={imgUrl}
-                  alt={`${title} thumbnail ${index + 1}`}
+                  alt=""
+                  sizes="64px"
                   fill
                   className="object-contain p-1"
                 />
@@ -66,10 +68,6 @@ export default function ProductImageGallery({
         </div>
       )}
 
-      <div className="flex items-center justify-center gap-2 text-xs text-copy-secondary">
-        <ShieldCheck className="w-4 h-4 text-brand-600" />
-        <span>Genuine retailer product preview</span>
-      </div>
     </div>
   );
 }

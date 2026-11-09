@@ -21,30 +21,50 @@ const config: Config = {
           800: "var(--brand-800, #0B4223)",
           900: "var(--brand-900, #09371E)",
         },
+        // Deep green-tinted neutral for headings, dark surfaces and strong badges.
+        ink: {
+          DEFAULT: "#0F1F15",
+          soft: "#1B2E21",
+          line: "#2A3F31",
+        },
+        // Saffron accent reserved for price drops and deal signals.
+        accent: {
+          50: "#FEF7E6",
+          100: "#FCEBC0",
+          400: "#F2B33D",
+          500: "#E09A12",
+          700: "#8A5A00",
+        },
         surface: {
           bg: "#F7F9F7",
           card: "#FFFFFF",
-          border: "#E5ECE5",
+          muted: "#EEF3EF",
+          border: "#E1E9E3",
         },
         copy: {
           primary: "#202820",
-          secondary: "#707870",
-          muted: "#949C94",
+          secondary: "#5F6A61",
+          muted: "#7E887F",
         },
       },
       fontFamily: {
-        sans: ["var(--font-sans)", "Inter", "system-ui", "sans-serif"],
-        display: ["var(--font-display)", "Outfit", "system-ui", "sans-serif"],
+        sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+        display: ["var(--font-display)", "var(--font-sans)", "system-ui", "sans-serif"],
+      },
+      letterSpacing: {
+        tightest: "-0.035em",
+      },
+      transitionTimingFunction: {
+        "out-expo": "cubic-bezier(0.16, 1, 0.3, 1)",
       },
       boxShadow: {
-        'soft-sm': '0 1px 3px rgba(32, 40, 32, 0.05), 0 1px 2px rgba(32, 40, 32, 0.03)',
-        'soft-md': '0 4px 12px -1px rgba(32, 40, 32, 0.08), 0 2px 6px -1px rgba(32, 40, 32, 0.04)',
-        'soft-lg': '0 12px 24px -4px rgba(32, 40, 32, 0.10), 0 4px 8px -2px rgba(32, 40, 32, 0.05)',
-        'card-hover': '0 16px 32px -4px rgba(22, 138, 69, 0.12), 0 6px 12px -2px rgba(32, 40, 32, 0.05)',
+        'soft-sm': '0 1px 2px rgba(15, 31, 21, 0.05), 0 1px 1px rgba(15, 31, 21, 0.03)',
+        'soft-md': '0 6px 16px -4px rgba(15, 31, 21, 0.10), 0 2px 4px -2px rgba(15, 31, 21, 0.05)',
+        'soft-lg': '0 18px 40px -12px rgba(15, 31, 21, 0.18), 0 4px 10px -4px rgba(15, 31, 21, 0.06)',
+        'card-hover': '0 14px 30px -12px rgba(16, 107, 54, 0.22), 0 4px 10px -4px rgba(15, 31, 21, 0.06)',
       },
     },
   },
   plugins: [],
 };
 export default config;
-

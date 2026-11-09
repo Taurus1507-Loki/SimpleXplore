@@ -3,9 +3,10 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Star, Heart, ExternalLink, TrendingUp } from 'lucide-react';
 import { Product } from '@/types';
 import { formatPrice } from '@/lib/utils/formatters';
-import { Star, Heart, ExternalLink, Sparkles, TrendingUp } from 'lucide-react';
 import { useWishlist } from './WishlistContext';
 
 interface ProductCardProps {
@@ -13,150 +14,136 @@ interface ProductCardProps {
   priority?: boolean;
 }
 
+const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800';
+
 export default function ProductCard({ product, priority = false }: ProductCardProps) {
   const { isInWishlist, toggleWishlist } = useWishlist();
   const wishlisted = isInWishlist(product.id);
-
-  const retailerColorClass: Record<string, string> = {
-    'Amazon India': 'bg-amber-50 text-amber-800 border-amber-200/80',
-    'Flipkart': 'bg-blue-50 text-blue-800 border-blue-200/80',
-    'Myntra': 'bg-rose-50 text-rose-800 border-rose-200/80',
-    'Nykaa': 'bg-pink-50 text-pink-800 border-pink-200/80',
-    'Tata CLiQ': 'bg-purple-50 text-purple-800 border-purple-200/80',
-    'Tata CLiQ Luxury': 'bg-zinc-100 text-zinc-900 border-zinc-300',
-  };
-
-  const badgeColor = retailerColorClass[product.retailer] || 'bg-emerald-50 text-emerald-800 border-emerald-200';
+  const href = `/products/${product.slug}`;
+  const hasPrice = product.current_price > 0;
+  const hasDiscount = !!product.discount && product.discount > 0;
+  const showOriginal = hasPrice && !!product.original_price && product.original_price > product.current_price;
 
   return (
-    <div className="group relative flex flex-col bg-white rounded-2xl border border-surface-border overflow-hidden hover:shadow-card-hover hover:border-brand-300/80 transition-all duration-300 ease-out">
-      {/* Top Badges (Trending / Featured / Discount) */}
-      <div className="absolute top-3 left-3 z-10 flex flex-wrap gap-1.5 pointer-events-none">
-        {product.discount && product.discount > 0 ? (
-          <span className="bg-brand-500 text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full shadow-sm tracking-tight">
-            {product.discount}% OFF
-          </span>
-        ) : null}
-
-        {product.trending && (
-          <span className="bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1">
-            <TrendingUp className="w-3 h-3" />
-            Trending
-          </span>
-        )}
-
-        {product.featured && (
-          <span className="bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1">
-            <Sparkles className="w-3 h-3" />
-            Featured
-          </span>
-        )}
-      </div>
-
-      {/* Wishlist Button (Heart) */}
-      <button
-        type="button"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          toggleWishlist(product);
-        }}
-        className={`absolute top-3 right-3 z-10 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
-          wishlisted
-            ? 'bg-rose-50 text-rose-500 shadow-sm'
-            : 'bg-white/90 backdrop-blur-sm text-copy-muted hover:text-rose-500 hover:bg-white shadow-soft-sm'
-        }`}
-        aria-label={wishlisted ? 'Remove from wishlist' : 'Save to wishlist'}
-      >
-        <Heart className={`w-4 h-4 transition-transform active:scale-125 ${wishlisted ? 'fill-rose-500' : ''}`} />
-      </button>
-
-      {/* Product Image */}
-      <Link href={`/products/${product.slug}`} className="relative w-full pt-[90%] overflow-hidden bg-[#FBFDFB]">
+    <motion.article
+      whileHover={{ y: -2 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+      className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-surface-border bg-white transition-[border-color,box-shadow] duration-300 hover:border-brand-200 hover:shadow-card-hover"
+    >
+      {/* Image */}
+      <Link href={href} className="relative block aspect-square overflow-hidden bg-surface-muted/60" tabIndex={-1} aria-hidden="true">
         <Image
-          src={product.image_url || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800'}
-          alt={product.title}
+          src={product.image_url || FALLBACK_IMAGE}
+          alt=""
           fill
           priority={priority}
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-          className="object-contain p-4 group-hover:scale-105 transition-transform duration-300 ease-out"
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+          className="object-contain p-3 mix-blend-multiply transition-transform duration-500 ease-out-expo group-hover:scale-[1.03] sm:p-5"
         />
       </Link>
 
-      {/* Content Area */}
-      <div className="flex flex-col flex-1 p-4 justify-between">
-        <div className="space-y-2">
-          {/* Retailer & Category Tag */}
-          <div className="flex items-center justify-between text-[11px] text-copy-secondary">
-            <span className={`px-2 py-0.5 rounded-md font-medium border ${badgeColor}`}>
-              {product.retailer}
-            </span>
-            {product.category && (
-              <span className="text-copy-muted truncate max-w-[110px]">
-                {product.category.name}
-              </span>
-            )}
-          </div>
+      {/* Badges */}
+      <div className="pointer-events-none absolute left-2.5 top-2.5 flex flex-col items-start gap-1 sm:left-3 sm:top-3">
+        {hasDiscount && (
+          <span className="tabular rounded-md bg-accent-400 px-2 py-0.5 text-[11px] font-bold text-ink">
+            {product.discount}% off
+          </span>
+        )}
+        {product.trending && (
+          <span className="inline-flex items-center gap-1 rounded-md bg-white/95 px-1.5 py-0.5 text-[10px] font-semibold text-brand-800 shadow-soft-sm">
+            <TrendingUp className="h-3 w-3" aria-hidden="true" /> Trending
+          </span>
+        )}
+        {product.featured && !product.trending && (
+          <span className="rounded-md bg-ink px-1.5 py-0.5 text-[10px] font-semibold text-white">Featured</span>
+        )}
+      </div>
 
-          {/* Product Title */}
-          <Link href={`/products/${product.slug}`}>
-            <h3 className="font-semibold text-sm text-copy-primary line-clamp-2 group-hover:text-brand-600 transition-colors leading-snug">
-              {product.title}
-            </h3>
-          </Link>
+      {/* Wishlist */}
+      <motion.button
+        type="button"
+        whileTap={{ scale: 0.85 }}
+        onClick={(e) => {
+          e.preventDefault();
+          toggleWishlist(product);
+        }}
+        aria-pressed={wishlisted}
+        aria-label={wishlisted ? `Remove ${product.title} from wishlist` : `Save ${product.title} to wishlist`}
+        className={`absolute right-1.5 top-1.5 z-10 flex h-11 w-11 items-center justify-center rounded-full transition-colors sm:right-2 sm:top-2 ${
+          wishlisted ? 'text-red-600' : 'text-copy-muted hover:text-red-600'
+        }`}
+      >
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/95 shadow-soft-sm">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.span
+              key={wishlisted ? 'on' : 'off'}
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.5, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 600, damping: 20 }}
+            >
+              <Heart className={`h-4 w-4 ${wishlisted ? 'fill-current' : ''}`} aria-hidden="true" />
+            </motion.span>
+          </AnimatePresence>
+        </span>
+      </motion.button>
 
-          {/* Ratings & Reviews */}
-          {product.rating ? (
-            <div className="flex items-center gap-1.5 text-xs text-copy-secondary">
-              <div className="flex items-center gap-1 bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-semibold text-[11px]">
-                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                <span>{product.rating.toFixed(1)}</span>
-              </div>
-              {product.review_count ? (
-                <span className="text-copy-muted text-[11px]">
-                  ({product.review_count.toLocaleString('en-IN')})
-                </span>
-              ) : null}
-            </div>
-          ) : (
-            <div className="h-5" /> // Alignment spacer
-          )}
+      {/* Body */}
+      <div className="flex flex-1 flex-col gap-2 p-3 sm:p-4">
+        <div className="flex items-center justify-between gap-2 text-[11px] text-copy-muted">
+          <span className="truncate font-semibold uppercase tracking-wide text-copy-secondary">{product.retailer}</span>
+          {product.category && <span className="hidden truncate sm:inline">{product.category.name}</span>}
         </div>
 
-        {/* Pricing & CTA */}
-        <div className="pt-3 border-t border-surface-border/60 mt-3 space-y-2.5">
-          <div className="flex items-baseline gap-2">
-            <span className="text-lg font-bold text-copy-primary font-display">
-              {formatPrice(product.current_price, product.currency)}
-            </span>
-            {product.original_price && product.original_price > product.current_price && (
-              <span className="text-xs text-copy-muted line-through">
-                {formatPrice(product.original_price, product.currency)}
-              </span>
+        <h3 className="line-clamp-2 text-[0.8125rem] font-semibold leading-snug text-ink sm:text-sm">
+          <Link href={href} className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-none group-focus-within:underline">
+            {product.title}
+          </Link>
+        </h3>
+
+        {product.rating ? (
+          <div className="flex items-center gap-1 text-xs text-copy-secondary">
+            <Star className="h-3.5 w-3.5 fill-accent-400 text-accent-400" aria-hidden="true" />
+            <span className="tabular font-semibold text-copy-primary">{product.rating.toFixed(1)}</span>
+            {product.review_count ? (
+              <span className="tabular text-copy-muted">({product.review_count.toLocaleString('en-IN')})</span>
+            ) : null}
+            <span className="sr-only">out of 5 stars</span>
+          </div>
+        ) : null}
+
+        <div className="mt-auto flex items-end justify-between gap-2 pt-2">
+          <div className="min-w-0">
+            {hasPrice ? (
+              <p className="flex flex-wrap items-baseline gap-x-1.5">
+                <span className="tabular font-display text-lg font-bold tracking-tight text-ink">
+                  {formatPrice(product.current_price, product.currency)}
+                </span>
+                {showOriginal && (
+                  <span className="tabular text-xs text-copy-muted line-through">
+                    <span className="sr-only">Was </span>
+                    {formatPrice(product.original_price!, product.currency)}
+                  </span>
+                )}
+              </p>
+            ) : (
+              <p className="text-xs font-medium text-copy-secondary">Check price at {product.retailer}</p>
             )}
           </div>
 
-          {/* Affiliate Direct CTA */}
-          <div className="flex items-center gap-2">
-            <Link
-              href={`/products/${product.slug}`}
-              className="flex-1 text-center text-xs font-semibold py-2 px-3 rounded-xl border border-surface-border text-copy-primary hover:bg-surface-bg hover:border-brand-400 transition-colors"
-            >
-              View Details
-            </Link>
-            <a
-              href={`/r/${product.id}`}
-              target="_blank"
-              rel="nofollow sponsored noopener"
-              className="flex-1 inline-flex items-center justify-center gap-1 text-center text-xs font-semibold py-2 px-3 rounded-xl bg-brand-500 hover:bg-brand-600 active:scale-[0.98] text-white shadow-soft-sm transition-all"
-            >
-              <span>Buy Now</span>
-              <ExternalLink className="w-3 h-3 opacity-80" />
-            </a>
-          </div>
+          {/* Direct-to-retailer shortcut; sits above the stretched card link. */}
+          <a
+            href={`/r/${product.id}`}
+            target="_blank"
+            rel="nofollow sponsored noopener"
+            aria-label={`Buy ${product.title} on ${product.retailer} (opens in new tab)`}
+            className="relative z-10 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white shadow-soft-sm transition-colors hover:bg-brand-700 active:scale-95 sm:w-auto sm:gap-1.5 sm:px-3"
+          >
+            <span className="hidden text-xs font-semibold sm:inline">Buy</span>
+            <ExternalLink className="h-4 w-4 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
+          </a>
         </div>
       </div>
-    </div>
+    </motion.article>
   );
 }
-

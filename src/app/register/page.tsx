@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import Logo from '@/components/Logo';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { UserPlus, ArrowRight } from 'lucide-react';
@@ -57,23 +58,9 @@ export default function RegisterPage() {
   return (
     <div className="max-w-md mx-auto px-4 py-16 space-y-6">
       <div className="text-center space-y-3">
-        <Link href="/" className="inline-flex flex-col items-center group">
-          <div className="flex items-center gap-2.5">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-black text-2xl shadow-soft-md group-hover:scale-105 transition-transform duration-200">
-              S
-            </div>
-            <div className="text-left">
-              <span className="font-display font-black text-2xl tracking-tight text-copy-primary">
-                Simple<span className="text-brand-500">Xplore</span>
-              </span>
-              <span className="block text-[10px] uppercase tracking-wider text-copy-secondary font-semibold -mt-1">
-                Shop Smart • Explore More
-              </span>
-            </div>
-          </div>
-        </Link>
+        <Logo className="justify-center" />
         <div>
-          <h1 className="text-2xl font-black font-display text-copy-primary">
+          <h1 className="text-2xl font-bold tracking-tight font-display text-ink">
             Create Customer Account
           </h1>
           <p className="text-xs text-copy-secondary mt-1">
@@ -84,15 +71,16 @@ export default function RegisterPage() {
 
       <div className="bg-white p-8 rounded-3xl border border-surface-border shadow-soft-sm space-y-5">
         {error && (
-          <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs">
+          <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs">
             {error}
           </div>
         )}
 
         <form onSubmit={handleRegister} className="space-y-4 text-xs sm:text-sm">
           <div>
-            <label className="block font-semibold text-copy-primary mb-1">Full Name</label>
+            <label htmlFor="name" className="block font-semibold text-copy-primary mb-1">Full Name</label>
             <input
+              id="name"
               type="text"
               required
               value={fullName}
@@ -103,9 +91,11 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label className="block font-semibold text-copy-primary mb-1">Email Address</label>
+            <label htmlFor="email" className="block font-semibold text-copy-primary mb-1">Email Address</label>
             <input
+              id="email"
               type="email"
+              autoComplete="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -115,8 +105,9 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label className="block font-semibold text-copy-primary mb-1">Password</label>
+            <label htmlFor="password" className="block font-semibold text-copy-primary mb-1">Password</label>
             <input
+              id="password"
               type="password"
               required
               minLength={6}

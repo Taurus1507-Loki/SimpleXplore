@@ -1,7 +1,11 @@
+import { requireAdminApi } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
 export async function POST(req: NextRequest) {
+  const denied = await requireAdminApi();
+  if (denied) return denied;
+
   try {
     const { importId, action, productData } = await req.json();
 

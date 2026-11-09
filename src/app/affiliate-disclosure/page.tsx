@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { ShieldCheck, Info } from 'lucide-react';
 
 export const metadata = {
-  title: 'Affiliate Disclosure | SimpleXplore',
+  alternates: { canonical: '/affiliate-disclosure' },
+  title: 'Affiliate Disclosure',
   description: 'Full transparency regarding our affiliate partnerships, link tracking and revenue disclosure.',
 };
 

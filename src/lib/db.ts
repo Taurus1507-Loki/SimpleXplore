@@ -8,15 +8,7 @@ import {
 } from '@/types';
 import { createAdminClient } from '@/lib/supabase/admin';
 
-// Check if live Supabase credentials are configured
-function isSupabaseConfigured(): boolean {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return false;
-  if (url.includes('placeholder') || url.includes('example.supabase.co')) return false;
-  if (key.includes('dummy')) return false;
-  return true;
-}
+import { isSupabaseConfigured } from '@/lib/supabase/config';
 
 // -----------------------------------------------------------------------------
 // INITIAL SEED DATA (Used in Demo Mode & Initial DB Seeding)
@@ -270,12 +262,12 @@ class DataRepository {
           highlights: imp.extracted_data.highlights || null,
           category_id: 'cat-electronics',
           retailer: imp.extracted_data.retailer || 'Amazon India',
-          current_price: imp.extracted_data.price || 999,
+          current_price: imp.extracted_data.price ?? 0,
           original_price: imp.extracted_data.original_price || null,
           currency: 'INR',
-          discount: imp.extracted_data.discount || 0,
-          rating: imp.extracted_data.rating || 4.2,
-          review_count: imp.extracted_data.review_count || 100,
+          discount: imp.extracted_data.discount ?? null,
+          rating: imp.extracted_data.rating ?? null,
+          review_count: imp.extracted_data.review_count ?? null,
           image_url: imp.extracted_data.image_url || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800',
           affiliate_url: imp.affiliate_url,
           featured: false,
@@ -443,6 +435,12 @@ class DataRepository {
     };
   }
 
+  /** Public lookup: only returns published products (drafts are never public). */
+  async getPublishedProductBySlug(slug: string): Promise<Product | null> {
+    const product = await this.getProductBySlug(slug);
+    return product && product.status === 'published' ? product : null;
+  }
+
   async getProductById(id: string): Promise<Product | null> {
     const found = this.products.find(p => p.id === id);
     if (!found) return null;
@@ -465,8 +463,8 @@ class DataRepository {
       original_price: data.original_price || null,
       currency: data.currency || 'INR',
       discount: data.discount || 0,
-      rating: data.rating || 0,
-      review_count: data.review_count || 0,
+      rating: data.rating ?? null,
+      review_count: data.review_count ?? null,
       image_url: data.image_url || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800',
       affiliate_url: data.affiliate_url || '#',
       featured: data.featured || false,
@@ -668,15 +666,10 @@ class DataRepository {
     const pendingDrafts = this.products.filter(p => p.status === 'draft').length;
     const totalTelegramImports = this.telegramImports.length;
     const pendingReviewImports = this.telegramImports.filter(i => i.review_status === 'pending').length;
-    const totalClicks = this.affiliateClicks.length + 184; // Include baseline demo clicks
+    const totalClicks = this.affiliateClicks.length;
 
     // Retailer breakdown
-    const clicksByRetailer: Record<string, number> = {
-      'Amazon India': 92,
-      'Flipkart': 54,
-      'Myntra': 24,
-      'Nykaa': 14,
-    };
+    const clicksByRetailer: Record<string, number> = {};
 
     for (const c of this.affiliateClicks) {
       if (c.retailer) {

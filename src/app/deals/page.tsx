@@ -1,39 +1,38 @@
 import React from 'react';
+import type { Metadata } from 'next';
 import { db } from '@/lib/db';
 import ProductGrid from '@/components/ProductGrid';
-import { Percent, Sparkles } from 'lucide-react';
+import PageHeader from '@/components/PageHeader';
+import JsonLd from '@/components/JsonLd';
+import { itemListJsonLd } from '@/lib/seo';
 
 export const dynamic = 'force-dynamic';
 
+export const metadata: Metadata = {
+  title: "Today's best deals & price drops in India",
+  description:
+    'The biggest discounts currently listed on SimpleXplore — products at 15% off or more from Amazon, Flipkart, Myntra and other Indian retailers, sorted by savings.',
+  alternates: { canonical: '/deals' },
+};
+
 export default async function DealsPage() {
-  const { products } = await db.getProducts({
-    status: 'published',
-    isDeals: true,
-    sort: 'discount',
-  });
+  const { products } = await db.getProducts({ status: 'published', isDeals: true, sort: 'discount' });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-      <div className="bg-gradient-to-r from-amber-500/10 via-brand-50 to-emerald-50/50 p-6 sm:p-8 rounded-3xl border border-amber-200/60">
-        <div className="max-w-2xl space-y-2">
-          <div className="inline-flex items-center gap-1.5 bg-amber-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-sm">
-            <Percent className="w-3.5 h-3.5" />
-            <span>Highest Verified Discounts</span>
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold font-display text-copy-primary">
-            Today&apos;s Hottest Deals & Price Drops
-          </h1>
-          <p className="text-sm text-copy-secondary">
-            Products with at least 15% to 50%+ verified discounts across Amazon India, Flipkart, Myntra and Tata CLiQ.
-          </p>
-        </div>
-      </div>
-
-      <ProductGrid 
-        products={products} 
-        emptyMessage="No deals currently live above 15% off. Check back shortly as Telegram imports are reviewed!" 
+    <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+      {products.length > 0 && <JsonLd data={itemListJsonLd('Latest deals', products)} />}
+      <PageHeader
+        crumbs={[{ name: 'Latest deals', path: '/deals' }]}
+        eyebrow="Price drops"
+        title="Latest deals"
+        description="Products listed at 15% off or more, biggest savings first. Discounts are as listed by the retailer at the time we last checked."
+        meta={products.length > 0 ? `${products.length} deals` : undefined}
+      />
+      <ProductGrid
+        products={products}
+        priorityCount={4}
+        emptyMessage="No deals at 15% off or more right now. New finds are added regularly — check back soon."
       />
     </div>
   );
 }
-

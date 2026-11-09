@@ -1,11 +1,9 @@
 import React from 'react';
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeaderActions from '@/components/admin/AdminHeaderActions';
 import { ShieldCheck } from 'lucide-react';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { isUserAdmin } from '@/lib/auth';
+import { getAdminSession } from '@/lib/auth';
 
 export const metadata = {
   title: 'Admin Dashboard | SimpleXplore',
@@ -16,32 +14,9 @@ export const metadata = {
 };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const cookieStore = cookies();
-  const hasAdminCookie = cookieStore.get('sx_admin_demo')?.value === 'true';
-  const cookieUserEmail = cookieStore.get('sx_user_email')?.value;
-
-  let authorized = false;
-
-  // 1. Check quick admin session cookie
-  if (hasAdminCookie || (cookieUserEmail && isUserAdmin(cookieUserEmail))) {
-    authorized = true;
-  }
-
-  // 2. Check live Supabase Auth session if not already authorized
-  if (!authorized) {
-    try {
-      const supabase = await createServerSupabaseClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.email && isUserAdmin(session.user.email, session.user.user_metadata?.role)) {
-        authorized = true;
-      }
-    } catch {
-      // Fallback
-    }
-  }
-
-  // Strict Protection: Boot non-admins to login
-  if (!authorized) {
+  // Server-side verification of the signed admin session (middleware also checks).
+  const session = await getAdminSession();
+  if (!session) {
     redirect('/login?redirect=/admin&error=unauthorized');
   }
 

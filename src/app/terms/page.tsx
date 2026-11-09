@@ -1,7 +1,8 @@
 import React from 'react';
 
 export const metadata = {
-  title: 'Terms and Conditions | SimpleXplore',
+  alternates: { canonical: '/terms' },
+  title: 'Terms and Conditions',
 };
 
 export default function TermsPage() {

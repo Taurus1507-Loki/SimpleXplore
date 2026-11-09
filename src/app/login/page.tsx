@@ -2,10 +2,9 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
+import Logo from '@/components/Logo';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
-import { ShieldCheck, LogIn, AlertCircle } from 'lucide-react';
-import { isUserAdmin } from '@/lib/auth';
+import { LogIn, AlertCircle } from 'lucide-react';
 
 function LoginForm() {
   const [email, setEmail] = useState('');
@@ -26,50 +25,25 @@ function LoginForm() {
     setError(null);
     setLoading(true);
 
-    const trimmedEmail = email.trim();
-    const isAdminAccount = isUserAdmin(trimmedEmail);
-
     try {
-      const supabase = createClient();
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email: trimmedEmail,
-        password,
+      // Credentials are verified on the server; admin status is decided there
+      // and stored in a signed httpOnly cookie the browser cannot forge.
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+          redirect: searchParams.get('redirect') || undefined,
+        }),
       });
-
-      if (signInError) {
-        if (
-          process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ||
-          isAdminAccount ||
-          signInError.message.includes('placeholder')
-        ) {
-          if (isAdminAccount) {
-            document.cookie = 'sx_admin_demo=true; path=/; max-age=86400';
-            document.cookie = `sx_user_email=${encodeURIComponent(trimmedEmail)}; path=/; max-age=86400`;
-            router.push('/admin');
-            router.refresh();
-            return;
-          } else {
-            document.cookie = `sx_user_email=${encodeURIComponent(trimmedEmail)}; path=/; max-age=86400`;
-            router.push('/products');
-            router.refresh();
-            return;
-          }
-        }
-        setError(signInError.message);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || 'Sign in failed.');
         setLoading(false);
         return;
       }
-
-      const authenticatedEmail = data.user?.email || trimmedEmail;
-      const isMasterAdmin = isUserAdmin(authenticatedEmail, data.user?.user_metadata?.role);
-
-      document.cookie = `sx_user_email=${encodeURIComponent(authenticatedEmail)}; path=/; max-age=86400`;
-      if (isMasterAdmin) {
-        document.cookie = 'sx_admin_demo=true; path=/; max-age=86400';
-        router.push('/admin');
-      } else {
-        router.push('/products');
-      }
+      router.push(data.redirect || '/products');
       router.refresh();
     } catch {
       setError('An error occurred during authentication.');
@@ -80,23 +54,9 @@ function LoginForm() {
   return (
     <div className="max-w-md mx-auto px-4 py-16 space-y-6">
       <div className="text-center space-y-3">
-        <Link href="/" className="inline-flex flex-col items-center group">
-          <div className="flex items-center gap-2.5">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-black text-2xl shadow-soft-md group-hover:scale-105 transition-transform duration-200">
-              S
-            </div>
-            <div className="text-left">
-              <span className="font-display font-black text-2xl tracking-tight text-copy-primary">
-                Simple<span className="text-brand-500">Xplore</span>
-              </span>
-              <span className="block text-[10px] uppercase tracking-wider text-copy-secondary font-semibold -mt-1">
-                Shop Smart • Explore More
-              </span>
-            </div>
-          </div>
-        </Link>
+        <Logo className="justify-center" />
         <div>
-          <h1 className="text-2xl font-black font-display text-copy-primary">
+          <h1 className="text-2xl font-bold tracking-tight font-display text-ink">
             Sign In to SimpleXplore
           </h1>
           <p className="text-xs text-copy-secondary mt-1">
@@ -107,17 +67,19 @@ function LoginForm() {
 
       <div className="bg-white p-8 rounded-3xl border border-surface-border shadow-soft-sm space-y-5">
         {error && (
-          <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
+          <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
             <span>{error}</span>
           </div>
         )}
 
         <form onSubmit={handleLogin} className="space-y-4 text-xs sm:text-sm">
           <div>
-            <label className="block font-semibold text-copy-primary mb-1">Email Address</label>
+            <label htmlFor="email" className="block font-semibold text-copy-primary mb-1">Email Address</label>
             <input
+              id="email"
               type="email"
+              autoComplete="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -127,8 +89,9 @@ function LoginForm() {
           </div>
 
           <div>
-            <label className="block font-semibold text-copy-primary mb-1">Password</label>
+            <label htmlFor="password" className="block font-semibold text-copy-primary mb-1">Password</label>
             <input
+              id="password"
               type="password"
               required
               value={password}
