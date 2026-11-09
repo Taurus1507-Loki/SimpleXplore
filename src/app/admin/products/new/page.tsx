@@ -8,10 +8,11 @@ import type { Product } from '@/types';
 export const revalidate = 0;
 
 interface NewProductPageProps {
-  searchParams: { fromImport?: string };
+  searchParams: Promise<{ fromImport?: string }>;
 }
 
-export default async function NewProductPage({ searchParams }: NewProductPageProps) {
+export default async function NewProductPage(props: NewProductPageProps) {
+  const searchParams = await props.searchParams;
   const categories = await db.getCategories();
 
   // "Create manually" from a failed Telegram import: pre-fill only what we actually know.

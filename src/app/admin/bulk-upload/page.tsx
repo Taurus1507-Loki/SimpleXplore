@@ -189,7 +189,7 @@ export default function BulkUploadPage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv,.xlsx,.xls"
+              accept=".csv,.xlsx"
               className="sr-only"
               tabIndex={-1}
               onChange={(e) => {
@@ -202,7 +202,7 @@ export default function BulkUploadPage() {
               {busy ? <Loader2 className="h-7 w-7 animate-spin" /> : <UploadCloud className="h-7 w-7" />}
             </span>
             <span className="block text-sm font-bold text-copy-primary">{busy ? `Reading ${file?.name}…` : 'Click or drop a CSV / Excel file'}</span>
-            <span className="block text-xs text-copy-secondary">.csv, .xlsx or .xls · up to 10 MB · up to 2,000 rows</span>
+            <span className="block text-xs text-copy-secondary">.csv or .xlsx · up to 10 MB · up to 2,000 rows</span>
           </button>
         </>
       )}

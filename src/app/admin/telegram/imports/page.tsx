@@ -5,14 +5,15 @@ import { Send, ArrowRight } from 'lucide-react';
 import ImportsClient from './ImportsClient';
 
 interface TelegramImportsPageProps {
-  searchParams: {
+  searchParams: Promise<{
     status?: string;
-  };
+  }>;
 }
 
 export const dynamic = 'force-dynamic';
 
-export default async function TelegramImportsPage({ searchParams }: TelegramImportsPageProps) {
+export default async function TelegramImportsPage(props: TelegramImportsPageProps) {
+  const searchParams = await props.searchParams;
   const statusFilter = searchParams.status || 'pending';
   const [allImports, postsReceived, queue] = await Promise.all([
     db.getTelegramImports(),

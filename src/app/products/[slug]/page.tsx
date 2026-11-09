@@ -19,7 +19,7 @@ import { Product } from '@/types';
 export const dynamic = 'force-dynamic';
 
 interface ProductDetailPageProps {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }
 
 /** Published products for everyone; drafts only for the signed-in admin (preview). */
@@ -33,7 +33,8 @@ async function loadProduct(slug: string): Promise<{ product: Product; preview: b
   return null;
 }
 
-export async function generateMetadata({ params }: ProductDetailPageProps): Promise<Metadata> {
+export async function generateMetadata(props: ProductDetailPageProps): Promise<Metadata> {
+  const params = await props.params;
   const result = await loadProduct(params.slug);
   if (!result) return { title: 'Product not found', robots: { index: false, follow: true } };
   const { product, preview } = result;
@@ -77,7 +78,8 @@ function formatUpdated(date: string | undefined) {
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
+export default async function ProductDetailPage(props: ProductDetailPageProps) {
+  const params = await props.params;
   const result = await loadProduct(params.slug);
   if (!result) notFound();
   const { product, preview } = result;

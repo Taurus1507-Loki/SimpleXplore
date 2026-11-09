@@ -5,18 +5,19 @@ import ProductCatalogClient from '@/components/ProductCatalogClient';
 import PageHeader from '@/components/PageHeader';
 
 interface ProductsPageProps {
-  searchParams: {
+  searchParams: Promise<{
     category?: string;
     retailer?: string;
     search?: string;
     sort?: 'newest' | 'price_low' | 'price_high' | 'discount' | 'rating';
     featured?: string;
-  };
+  }>;
 }
 
 export const dynamic = 'force-dynamic';
 
-export async function generateMetadata({ searchParams }: ProductsPageProps): Promise<Metadata> {
+export async function generateMetadata(props: ProductsPageProps): Promise<Metadata> {
+  const searchParams = await props.searchParams;
   const filtered = Boolean(
     searchParams.search || searchParams.category || searchParams.retailer || searchParams.sort || searchParams.featured
   );
@@ -31,7 +32,8 @@ export async function generateMetadata({ searchParams }: ProductsPageProps): Pro
   };
 }
 
-export default async function ProductsPage({ searchParams }: ProductsPageProps) {
+export default async function ProductsPage(props: ProductsPageProps) {
+  const searchParams = await props.searchParams;
   const [categories, { products }] = await Promise.all([
     db.getCategories(),
     db.getProducts({ status: 'published' }),

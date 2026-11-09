@@ -40,11 +40,11 @@
 
 ## 🛠️ Technology Stack
 
-- **Framework**: Next.js 14 (App Router) with TypeScript & React 18
+- **Framework**: Next.js 15 (App Router) with TypeScript & React 19
 - **Styling**: Tailwind CSS & Lucide Icons
 - **Database & Auth**: Supabase PostgreSQL with Row Level Security (RLS) & Supabase Auth
 - **HTML & Metadata Extraction**: Cheerio
-- **Spreadsheets**: SheetJS (`xlsx`) for CSV & XLSX generation and parsing
+- **Spreadsheets**: ExcelJS (.xlsx) and Papa Parse (.csv) for bulk upload and templates
 - **Testing**: Vitest test runner
 
 ---
@@ -190,6 +190,8 @@ All 9 critical test suites pass out-of-the-box:
 - [x] Admin access via a signed httpOnly session cookie, enforced in middleware and in every admin API handler; login is rate-limited.
 - [x] Draft products are never publicly viewable or redirectable; the admin gets a noindex preview.
 - [x] JSON-LD output is escaped against script injection from untrusted product text.
+- [x] Image optimizer only fetches from allow-listed HTTPS hosts (`image-hosts.mjs`); other images load directly in the browser. Add a retailer CDN there to have its images optimized.
+- [x] `npm audit --omit=dev` reports 0 vulnerabilities (Next.js 15.5.28; `postcss` and `uuid` pinned to patched versions via `overrides`).
 - [x] Idempotent Telegram update handler preventing duplicate processing.
 - [x] Outbound affiliate links redirect with `302`, `X-Robots-Tag: noindex, nofollow`, and `rel="nofollow sponsored"`.
 - [x] Customer wishlist isolation via private user IDs and Row Level Security.

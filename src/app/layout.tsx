@@ -83,7 +83,7 @@ export default async function RootLayout({
     .join(' ');
 
   // Display-only hint; admin status comes solely from the signed session.
-  const hintedEmail = cookies().get('sx_user_email')?.value;
+  const hintedEmail = (await cookies()).get('sx_user_email')?.value;
   const initialEmail = adminSession?.email ?? (hintedEmail ? decodeURIComponent(hintedEmail) : null);
 
   return (

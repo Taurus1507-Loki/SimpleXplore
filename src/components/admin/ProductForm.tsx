@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
+import Image from '@/components/SafeImage';
 import { Product, Category, ProductAvailability } from '@/types';
 import { formatPrice } from '@/lib/utils/formatters';
 import { Save, Globe, Eye, CheckCircle2, AlertCircle, UploadCloud, Plus, Trash2, Star, Image as ImageIcon } from 'lucide-react';

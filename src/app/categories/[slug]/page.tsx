@@ -10,10 +10,11 @@ import { categoryDescription, itemListJsonLd } from '@/lib/seo';
 export const dynamic = 'force-dynamic';
 
 interface CategoryDetailPageProps {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }
 
-export async function generateMetadata({ params }: CategoryDetailPageProps): Promise<Metadata> {
+export async function generateMetadata(props: CategoryDetailPageProps): Promise<Metadata> {
+  const params = await props.params;
   const category = await db.getCategoryBySlug(params.slug);
   if (!category) return { title: 'Category not found', robots: { index: false, follow: true } };
   const description = categoryDescription(category);
@@ -30,7 +31,8 @@ export async function generateMetadata({ params }: CategoryDetailPageProps): Pro
   };
 }
 
-export default async function CategoryDetailPage({ params }: CategoryDetailPageProps) {
+export default async function CategoryDetailPage(props: CategoryDetailPageProps) {
+  const params = await props.params;
   const category = await db.getCategoryBySlug(params.slug);
   if (!category) notFound();
 

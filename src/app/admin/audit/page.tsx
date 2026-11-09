@@ -54,10 +54,11 @@ function summary(e: AuditLogEntry): string {
 }
 
 interface AuditPageProps {
-  searchParams: { page?: string; type?: string };
+  searchParams: Promise<{ page?: string; type?: string }>;
 }
 
-export default async function AuditLogPage({ searchParams }: AuditPageProps) {
+export default async function AuditLogPage(props: AuditPageProps) {
+  const searchParams = await props.searchParams;
   const page = Math.max(1, Number(searchParams.page) || 1);
   const type = ENTITY_FILTERS.some(f => f.value === searchParams.type) ? searchParams.type ?? '' : '';
   const { entries, total } = await db.getAuditLogs({ limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE, entityType: type || undefined });

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import Image from '@/components/SafeImage';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Search, ArrowUpRight } from 'lucide-react';

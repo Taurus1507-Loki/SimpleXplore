@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import Image from 'next/image';
+import Image from '@/components/SafeImage';
 import { ArrowUpRight } from 'lucide-react';
 import { db } from '@/lib/db';
 import PageHeader from '@/components/PageHeader';

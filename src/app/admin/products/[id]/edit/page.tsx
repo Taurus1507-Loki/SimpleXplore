@@ -6,14 +6,15 @@ import ProductForm from '@/components/admin/ProductForm';
 import { ArrowLeft, Edit } from 'lucide-react';
 
 interface EditProductPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export const revalidate = 0;
 
-export default async function EditProductPage({ params }: EditProductPageProps) {
+export default async function EditProductPage(props: EditProductPageProps) {
+  const params = await props.params;
   const [product, categories] = await Promise.all([
     db.getProductById(params.id),
     db.getCategories(),

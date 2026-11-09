@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import Image from 'next/image';
+import Image from '@/components/SafeImage';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Plus, Pencil, Trash2, Eye, EyeOff, X, Save, ExternalLink, AlertCircle } from 'lucide-react';

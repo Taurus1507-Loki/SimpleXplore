@@ -24,7 +24,7 @@ export function getConfiguredAdminEmail(): string | null {
 }
 
 export async function getAdminSession(): Promise<{ email: string } | null> {
-  const token = cookies().get(ADMIN_SESSION_COOKIE)?.value;
+  const token = (await cookies()).get(ADMIN_SESSION_COOKIE)?.value;
   return verifyAdminSessionToken(token);
 }
 
@@ -50,7 +50,7 @@ export async function getCustomer(): Promise<CustomerIdentity | null> {
     }
     return null;
   }
-  const session = await verifyCustomerSessionToken(cookies().get(CUSTOMER_SESSION_COOKIE)?.value);
+  const session = await verifyCustomerSessionToken((await cookies()).get(CUSTOMER_SESSION_COOKIE)?.value);
   return session ? { id: `demo:${session.email}`, email: session.email } : null;
 }
 

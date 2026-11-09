@@ -1,21 +1,22 @@
 import React from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import Image from '@/components/SafeImage';
 import { db } from '@/lib/db';
 import { formatPrice } from '@/lib/utils/formatters';
 import { PlusCircle, Edit, Trash2, ExternalLink, Sparkles, TrendingUp, Package } from 'lucide-react';
 import ProductTableActions from './ProductTableActions';
 
 interface AdminProductsPageProps {
-  searchParams: {
+  searchParams: Promise<{
     status?: string;
     search?: string;
-  };
+  }>;
 }
 
 export const revalidate = 0;
 
-export default async function AdminProductsPage({ searchParams }: AdminProductsPageProps) {
+export default async function AdminProductsPage(props: AdminProductsPageProps) {
+  const searchParams = await props.searchParams;
   const statusFilter = (searchParams.status || 'all') as 'all' | 'published' | 'draft' | 'archived';
   const search = searchParams.search;
 

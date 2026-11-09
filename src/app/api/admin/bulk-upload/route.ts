@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as XLSX from 'xlsx';
+import { readSpreadsheet, SpreadsheetError } from '@/lib/spreadsheet';
 import { requireAdminApi } from '@/lib/auth';
 import { audit } from '@/lib/audit';
 import { db } from '@/lib/db';
@@ -23,17 +23,6 @@ interface FailedRow {
   data: Record<string, unknown>;
 }
 
-async function readSheet(file: File): Promise<{ headers: string[]; rows: Record<string, unknown>[] }> {
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const workbook = XLSX.read(buffer, { type: 'buffer', cellFormula: false, cellHTML: false });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  if (!sheet) return { headers: [], rows: [] };
-  const headerRow = (XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, blankrows: false })[0] ?? []) as unknown[];
-  const headers = headerRow.map((h) => String(h ?? '').trim()).filter(Boolean);
-  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
-  return { headers, rows };
-}
-
 /**
  * Two steps, same endpoint:
  *  - mode=preview  → column headers, a few sample rows and a suggested column mapping
@@ -51,9 +40,14 @@ export async function POST(req: NextRequest) {
     const mode = formData.get('mode') === 'import' ? 'import' : 'preview';
     if (!(file instanceof File)) return NextResponse.json({ error: 'No file uploaded.' }, { status: 400 });
     if (file.size > MAX_BULK_FILE_BYTES) return NextResponse.json({ error: 'File is larger than 10 MB.' }, { status: 413 });
-    if (!/\.(csv|xlsx|xls)$/i.test(file.name)) return NextResponse.json({ error: 'Upload a .csv, .xlsx or .xls file.' }, { status: 415 });
-
-    const { headers, rows } = await readSheet(file);
+    let sheet;
+    try {
+      sheet = await readSpreadsheet(file.name, await file.arrayBuffer(), MAX_BULK_ROWS);
+    } catch (e) {
+      if (e instanceof SpreadsheetError) return NextResponse.json({ error: e.message }, { status: 400 });
+      throw e;
+    }
+    const { headers, rows } = sheet;
     if (headers.length === 0 || rows.length === 0) {
       return NextResponse.json({ error: 'The file has no header row or no data rows.' }, { status: 400 });
     }

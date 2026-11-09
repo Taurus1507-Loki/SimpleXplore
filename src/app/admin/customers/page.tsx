@@ -9,11 +9,12 @@ export const dynamic = 'force-dynamic';
 const PAGE_SIZE = 50;
 
 interface CustomersPageProps {
-  searchParams: { q?: string; page?: string };
+  searchParams: Promise<{ q?: string; page?: string }>;
 }
 
 /** Registered shoppers (read-only). Customers can only save wishlists; they never edit products. */
-export default async function CustomersPage({ searchParams }: CustomersPageProps) {
+export default async function CustomersPage(props: CustomersPageProps) {
+  const searchParams = await props.searchParams;
   const q = (searchParams.q ?? '').slice(0, 100);
   const page = Math.max(1, Number(searchParams.page) || 1);
   const { customers, total } = await db.getCustomers({ search: q, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE });

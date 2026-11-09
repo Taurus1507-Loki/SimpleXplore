@@ -4,14 +4,15 @@ import { db } from '@/lib/db';
 import ReviewClient from './ReviewClient';
 
 interface TelegramImportDetailPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export const revalidate = 0;
 
-export default async function TelegramImportDetailPage({ params }: TelegramImportDetailPageProps) {
+export default async function TelegramImportDetailPage(props: TelegramImportDetailPageProps) {
+  const params = await props.params;
   const [importItem, categories] = await Promise.all([
     db.getTelegramImportById(params.id),
     db.getCategories(),

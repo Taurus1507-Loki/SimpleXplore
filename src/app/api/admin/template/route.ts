@@ -1,6 +1,6 @@
 import { requireAdminApi } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
-import * as XLSX from 'xlsx';
+import { writeCsv, writeXlsx } from '@/lib/spreadsheet';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,13 +43,9 @@ export async function GET(req: NextRequest) {
     },
   ];
 
-  const worksheet = XLSX.utils.json_to_sheet(sampleData);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Products');
-
   if (format === 'xlsx') {
-    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-    return new NextResponse(buffer, {
+    const buffer = await writeXlsx('Products', sampleData);
+    return new NextResponse(new Uint8Array(buffer), {
       headers: {
         'Content-Disposition': 'attachment; filename="simplexplore_products_template.xlsx"',
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -57,13 +53,10 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // Default CSV format
-  const csvOutput = XLSX.utils.sheet_to_csv(worksheet);
-  return new NextResponse(csvOutput, {
+  return new NextResponse(writeCsv(sampleData), {
     headers: {
       'Content-Disposition': 'attachment; filename="simplexplore_products_template.csv"',
       'Content-Type': 'text/csv; charset=utf-8',
     },
   });
 }
-

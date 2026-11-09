@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useId, useRef, useState } from 'react';
-import Image from 'next/image';
+import Image from '@/components/SafeImage';
 import { ImagePlus, Loader2, Link2, X } from 'lucide-react';
 
 interface ImageUploadFieldProps {
