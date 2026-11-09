@@ -1,6 +1,9 @@
 import React from 'react';
 import Link from 'next/link';
 import { ShieldCheck, Info } from 'lucide-react';
+import { db } from '@/lib/db';
+
+export const dynamic = 'force-dynamic';
 
 export const metadata = {
   alternates: { canonical: '/affiliate-disclosure' },
@@ -8,7 +11,8 @@ export const metadata = {
   description: 'Full transparency regarding our affiliate partnerships, link tracking and revenue disclosure.',
 };
 
-export default function AffiliateDisclosurePage() {
+export default async function AffiliateDisclosurePage() {
+  const settings = await db.getSettings();
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
       <div className="space-y-3 border-b border-surface-border pb-6">
@@ -31,9 +35,8 @@ export default function AffiliateDisclosurePage() {
             <strong className="font-semibold block text-xs uppercase tracking-wider mb-1">
               Short Summary
             </strong>
-            <p className="text-xs leading-normal">
-              SimpleXplore is NOT a retail store. We do not sell items directly, process payments, or maintain warehouses. When you click links on our site and make purchases on merchant websites, we may earn an affiliate commission at no extra cost to you.
-            </p>
+            {/* Editable in Admin → Website Settings → Affiliate disclosure */}
+            <p className="text-xs leading-normal whitespace-pre-line">{settings.affiliate_disclosure}</p>
           </div>
         </div>
 

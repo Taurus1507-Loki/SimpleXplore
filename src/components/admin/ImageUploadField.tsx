@@ -8,7 +8,7 @@ interface ImageUploadFieldProps {
   label: string;
   value: string;
   onChange: (url: string) => void;
-  folder?: 'products' | 'categories';
+  folder?: 'products' | 'categories' | 'branding';
   required?: boolean;
   hint?: string;
 }

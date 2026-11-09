@@ -1,4 +1,8 @@
+'use client';
+
 import Link from 'next/link';
+import Image from 'next/image';
+import { useSiteSettings } from './SiteSettingsContext';
 
 interface LogoProps {
   tone?: 'light' | 'dark';
@@ -19,22 +23,36 @@ export function LogoMark({ className = 'w-9 h-9' }: { className?: string }) {
   );
 }
 
+/** Splits a camel-cased brand like "SimpleXplore" so the second word can be accented. */
+function splitBrand(name: string): [string, string] {
+  const m = /^([A-Z][a-z]+)([A-Z].*)$/.exec(name);
+  return m ? [m[1], m[2]] : [name, ''];
+}
+
+/** Brand lockup driven by Admin → Website Settings (name, tagline, uploaded logo). */
 export default function Logo({ tone = 'dark', showTagline = true, className = '' }: LogoProps) {
+  const { siteName, tagline, logoUrl } = useSiteSettings();
+  const [first, second] = splitBrand(siteName);
   const word = tone === 'dark' ? 'text-ink' : 'text-white';
   const accent = tone === 'dark' ? 'text-brand-600' : 'text-brand-300';
   const tag = tone === 'dark' ? 'text-copy-muted' : 'text-white/60';
 
   return (
-    <Link href="/" className={`group inline-flex items-center gap-2.5 ${className}`} aria-label="SimpleXplore home">
-      <LogoMark className="w-9 h-9 transition-transform duration-300 ease-out-expo group-hover:-rotate-6" />
+    <Link href="/" className={`group inline-flex items-center gap-2.5 ${className}`} aria-label={`${siteName} home`}>
+      {logoUrl ? (
+        <span className="relative block h-9 w-9 overflow-hidden rounded-xl bg-white">
+          <Image src={logoUrl} alt="" fill sizes="36px" className="object-contain" unoptimized={logoUrl.startsWith('/uploads/')} />
+        </span>
+      ) : (
+        <LogoMark className="w-9 h-9 transition-transform duration-300 ease-out-expo group-hover:-rotate-6" />
+      )}
       <span className="flex flex-col leading-none">
         <span className={`font-display text-[1.375rem] font-extrabold tracking-tightest ${word}`}>
-          Simple<span className={accent}>Xplore</span>
+          {first}
+          {second && <span className={accent}>{second}</span>}
         </span>
-        {showTagline && (
-          <span className={`mt-1 hidden text-[10px] font-semibold uppercase tracking-[0.14em] sm:block ${tag}`}>
-            Shop Smart • Explore More
-          </span>
+        {showTagline && tagline && (
+          <span className={`mt-1 hidden text-[10px] font-semibold uppercase tracking-[0.14em] sm:block ${tag}`}>{tagline}</span>
         )}
       </span>
     </Link>

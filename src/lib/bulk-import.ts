@@ -4,10 +4,11 @@
  */
 import type { Category } from '@/types';
 import { isSafeExternalUrl } from '@/lib/utils/ssrf';
+import type { ProductAvailability } from '@/types';
 
 export type BulkField =
   | 'title' | 'description' | 'category' | 'retailer' | 'image_url' | 'current_price'
-  | 'original_price' | 'currency' | 'affiliate_url' | 'rating' | 'review_count' | 'featured' | 'trending';
+  | 'original_price' | 'currency' | 'affiliate_url' | 'rating' | 'review_count' | 'featured' | 'trending' | 'availability';
 
 export interface BulkFieldDef {
   key: BulkField;
@@ -29,6 +30,7 @@ export const BULK_FIELDS: BulkFieldDef[] = [
   { key: 'description', label: 'Description', required: false, aliases: ['description', 'details', 'about', 'summary'] },
   { key: 'rating', label: 'Rating (0–5)', required: false, aliases: ['rating', 'stars', 'star rating'] },
   { key: 'review_count', label: 'Review count', required: false, aliases: ['review count', 'reviews', 'ratings count', 'number of reviews'] },
+  { key: 'availability', label: 'Availability (in stock / out of stock)', required: false, aliases: ['availability', 'stock', 'in stock', 'stock status'] },
   { key: 'featured', label: 'Featured (yes/no)', required: false, aliases: ['featured'] },
   { key: 'trending', label: 'Trending (yes/no)', required: false, aliases: ['trending'] },
 ];
@@ -80,6 +82,14 @@ const money = (v: unknown): number | undefined => {
   const n = parseFloat(s);
   return Number.isFinite(n) ? n : NaN;
 };
+/** Spreadsheet stock values → our values; blank or unrecognised stays unknown. */
+function parseAvailability(v: unknown): ProductAvailability | null {
+  const s = text(v).toLowerCase().replace(/[\s_-]+/g, '');
+  if (['instock', 'yes', 'available', 'y'].includes(s)) return 'in_stock';
+  if (['outofstock', 'no', 'soldout', 'n', 'unavailable'].includes(s)) return 'out_of_stock';
+  if (['limited', 'lowstock', 'limitedstock'].includes(s)) return 'limited';
+  return null;
+}
 const yes = (v: unknown) => ['true', 'yes', 'y', '1'].includes(text(v).toLowerCase());
 
 export interface ParsedRow {
@@ -98,6 +108,7 @@ export interface ParsedRow {
   review_count: number | null;
   featured: boolean;
   trending: boolean;
+  availability: ProductAvailability | null;
 }
 
 export type RowResult =
@@ -178,6 +189,7 @@ export function parseRow(raw: Record<string, unknown>, mapping: ColumnMapping, c
       affiliate_url: affiliate,
       rating,
       review_count: reviews,
+      availability: parseAvailability(get('availability')),
       featured: yes(get('featured')),
       trending: yes(get('trending')),
     },

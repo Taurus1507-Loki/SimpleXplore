@@ -37,7 +37,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unsupported file. Upload a JPG, PNG, WebP, GIF or AVIF image.' }, { status: 415 });
   }
 
-  const folder = form.get('folder') === 'categories' ? 'categories' : 'products';
+  const requested = String(form.get('folder') ?? '');
+  const folder = ['categories', 'branding'].includes(requested) ? requested : 'products';
   const name = `${folder}/${new Date().toISOString().slice(0, 7)}/${randomUUID()}.${type.ext}`;
 
   if (isSupabaseConfigured()) {

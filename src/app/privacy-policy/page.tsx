@@ -1,4 +1,5 @@
 import React from 'react';
+import { getSiteUrl } from '@/lib/seo';
 
 export const metadata = {
   alternates: { canonical: '/privacy-policy' },
@@ -19,7 +20,7 @@ export default function PrivacyPolicyPage() {
 
       <div className="bg-white p-8 rounded-3xl border border-surface-border space-y-6 text-sm text-copy-secondary leading-relaxed">
         <p>
-          At <strong>SimpleXplore</strong>, accessible from https://simplexplore.com, one of our main priorities is the privacy of our visitors. This Privacy Policy document outlines the types of information collected and how we use it.
+          At <strong>SimpleXplore</strong>, accessible from {getSiteUrl()}, one of our main priorities is the privacy of our visitors. This Privacy Policy document outlines the types of information collected and how we use it.
         </p>
 
         <h3 className="text-base font-bold text-copy-primary">1. Information We Collect</h3>

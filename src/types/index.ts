@@ -22,6 +22,9 @@ export interface Category {
   created_at?: string;
 }
 
+/** Stock status reported by the retailer; null/undefined = unknown (never guessed). */
+export type ProductAvailability = 'in_stock' | 'out_of_stock' | 'limited';
+
 export type ProductStatus = 'draft' | 'published' | 'archived';
 export type ProductSourceType = 'manual' | 'bulk_upload' | 'telegram';
 
@@ -48,6 +51,7 @@ export interface Product {
   source_type: ProductSourceType;
   seo_title?: string | null;
   seo_description?: string | null;
+  availability?: ProductAvailability | null;
   created_at: string;
   updated_at?: string;
   images?: ProductImage[];
@@ -124,6 +128,7 @@ export interface TelegramImport {
     /** Fields extraction could not verify; left blank for the admin to complete. */
     missing_fields?: string[];
     /** Telegram channel the post came from, and when it was posted (ISO). */
+    availability?: ProductAvailability;
     channel_name?: string;
     message_date?: string;
     /** Set when an edited Telegram post targets an already-published product. */
@@ -162,6 +167,8 @@ export interface WebsiteSettings {
   id: string;
   site_name: string;
   tagline: string;
+  /** Uploaded logo image; falls back to the built-in mark when empty. */
+  logo_url?: string | null;
   primary_color: string;
   default_currency: string;
   contact_email: string;

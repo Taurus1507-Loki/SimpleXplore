@@ -122,6 +122,7 @@ export async function POST(req: NextRequest) {
           review_count: r.review_count,
           image_url: r.image_url,
           affiliate_url: r.affiliate_url,
+          availability: r.availability,
           featured: r.featured,
           trending: r.trending,
           status: canPublish ? 'published' : 'draft',

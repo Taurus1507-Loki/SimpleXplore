@@ -177,6 +177,20 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             ) : (
               <p className="text-base font-medium text-copy-primary">See today&apos;s price on {product.retailer}</p>
             )}
+            {product.availability && (
+              <p
+                className={`mt-3 inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-semibold ${
+                  product.availability === 'in_stock'
+                    ? 'bg-brand-50 text-brand-800'
+                    : product.availability === 'limited'
+                      ? 'bg-accent-50 text-accent-700'
+                      : 'bg-red-50 text-red-700'
+                }`}
+              >
+                {product.availability === 'in_stock' ? 'In stock' : product.availability === 'limited' ? 'Limited stock' : 'Out of stock'}
+                <span className="font-normal opacity-80">at {product.retailer} when last checked</span>
+              </p>
+            )}
             <p className="mt-3 flex items-start gap-1.5 text-xs text-copy-muted">
               <Info className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span>

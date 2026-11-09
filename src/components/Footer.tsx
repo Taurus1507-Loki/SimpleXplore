@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Send, Instagram, Facebook } from 'lucide-react';
 import Logo from './Logo';
+import { useSiteSettings } from './SiteSettingsContext';
 import type { WebsiteSettings } from '@/types';
 
 function XIcon({ className }: { className?: string }) {
@@ -39,7 +40,7 @@ const COLUMNS = [
   {
     title: 'Company',
     links: [
-      ['About SimpleXplore', '/about'],
+      ['About us', '/about'],
       ['Contact', '/contact'],
       ['Affiliate disclosure', '/affiliate-disclosure'],
       ['Privacy policy', '/privacy-policy'],
@@ -50,6 +51,7 @@ const COLUMNS = [
 
 export default function Footer({ socialLinks }: { socialLinks?: WebsiteSettings['social_links'] }) {
   const pathname = usePathname();
+  const site = useSiteSettings();
 
   if (pathname.startsWith('/admin') || pathname === '/login' || pathname === '/register') {
     return null;
@@ -69,8 +71,7 @@ export default function Footer({ socialLinks }: { socialLinks?: WebsiteSettings[
           <div className="lg:col-span-4">
             <Logo tone="light" />
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/60">
-              Handpicked products and price drops from India&apos;s favourite online stores, in one easy place to
-              browse.
+              Handpicked products and price drops from India&apos;s favourite online stores, in one easy place to browse.
             </p>
             {socials.length > 0 && (
               <ul className="mt-6 flex gap-2">
@@ -80,7 +81,7 @@ export default function Footer({ socialLinks }: { socialLinks?: WebsiteSettings[
                       href={href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      aria-label={`SimpleXplore on ${label}`}
+                      aria-label={`${site.siteName} on ${label}`}
                       className="flex h-11 w-11 items-center justify-center rounded-xl bg-ink-soft text-white transition-colors hover:bg-brand-600"
                     >
                       <Icon className="h-4 w-4" />
@@ -111,16 +112,14 @@ export default function Footer({ socialLinks }: { socialLinks?: WebsiteSettings[
 
         <div className="mt-12 rounded-2xl border border-ink-line p-5 text-xs leading-relaxed text-white/55">
           <p className="font-semibold text-white/80">Affiliate disclosure</p>
-          <p className="mt-1">
-            SimpleXplore is a product discovery platform, not a store. We don&apos;t process payments, hold stock or
-            ship orders. When you buy through links on this site we may earn a commission, at no extra cost to you.
-            Prices and availability are set by retailers and can change at any time.
-          </p>
+          {/* Text comes from Admin → Website Settings → Affiliate disclosure. */}
+          <p className="mt-1 whitespace-pre-line">{site.affiliateDisclosure}</p>
+          <p className="mt-2">Prices and availability are set by retailers and can change at any time.</p>
         </div>
 
         <div className="mt-8 flex flex-col gap-2 border-t border-ink-line pt-6 text-xs text-white/45 sm:flex-row sm:justify-between">
-          <p>© {new Date().getFullYear()} SimpleXplore. All rights reserved.</p>
-          <p>Shop Smart • Explore More</p>
+          <p>© {new Date().getFullYear()} {site.siteName}. All rights reserved.</p>
+          {site.tagline && <p>{site.tagline}</p>}
         </div>
       </div>
     </footer>

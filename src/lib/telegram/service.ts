@@ -134,6 +134,7 @@ async function extractListing(
     category: metadata.category || undefined,
     rating: metadata.rating,
     review_count: metadata.review_count,
+    availability: metadata.availability,
     highlights: metadata.highlights && metadata.highlights.length > 0 ? metadata.highlights : [],
     // Anything we could not verify is left blank and listed here for the admin to fill in.
     missing_fields: [
@@ -175,6 +176,7 @@ async function createDraftProduct(listing: ExtractedListing, rawUrl: string): Pr
     currency: 'INR',
     discount,
     rating: extractedPayload.rating ?? null, // never invent ratings
+    availability: extractedPayload.availability ?? null, // only when the retailer page says so
     review_count: extractedPayload.review_count ?? null,
     image_url: extractedPayload.image_url ?? '', // blank until the admin adds a real image
     affiliate_url: rawUrl, // Preserve original affiliate link posted in Telegram

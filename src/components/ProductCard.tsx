@@ -60,6 +60,12 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
             <TrendingUp className="h-3 w-3" aria-hidden="true" /> Trending
           </span>
         )}
+        {product.availability === 'out_of_stock' && (
+          <span className="rounded-md bg-white/95 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 shadow-soft-sm">Out of stock</span>
+        )}
+        {product.availability === 'limited' && (
+          <span className="rounded-md bg-white/95 px-1.5 py-0.5 text-[10px] font-semibold text-accent-700 shadow-soft-sm">Limited stock</span>
+        )}
         {product.featured && !product.trending && (
           <span className="rounded-md bg-ink px-1.5 py-0.5 text-[10px] font-semibold text-white">Featured</span>
         )}

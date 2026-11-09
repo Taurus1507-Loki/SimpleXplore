@@ -1,3 +1,4 @@
+import type { ProductAvailability } from '@/types';
 import * as cheerio from 'cheerio';
 import { isSafeExternalUrl } from '@/lib/utils/ssrf';
 
@@ -13,6 +14,21 @@ export interface ExtractedProductInfo {
   rating?: number;
   review_count?: number;
   highlights?: string[];
+  /** Only set when the page states it (schema.org availability or product:availability meta). */
+  availability?: ProductAvailability;
+}
+
+/**
+ * Map schema.org / Open Graph availability values to ours. Unknown values → undefined (never guessed).
+ * e.g. "https://schema.org/InStock", "instock", "out of stock", "LimitedAvailability".
+ */
+export function normalizeAvailability(value: unknown): ProductAvailability | undefined {
+  if (typeof value !== 'string') return undefined;
+  const v = value.toLowerCase().replace(/^https?:\/\/schema\.org\//, '').replace(/[\s_-]+/g, '');
+  if (['instock', 'onlineonly', 'instoreonly', 'available'].includes(v)) return 'in_stock';
+  if (['outofstock', 'soldout', 'discontinued', 'oos', 'unavailable'].includes(v)) return 'out_of_stock';
+  if (['limitedavailability', 'limited', 'lowstock'].includes(v)) return 'limited';
+  return undefined;
 }
 
 export function detectRetailer(url: string): string {
@@ -97,6 +113,8 @@ export async function extractMetadataFromUrl(destinationUrl: string): Promise<Ex
 
           if (ldData.offers) {
             const offer = Array.isArray(ldData.offers) ? ldData.offers[0] : ldData.offers;
+            const availability = normalizeAvailability(offer?.availability);
+            if (availability) info.availability = availability;
             if (offer && offer.price) {
               const numericPrice = parseFloat(String(offer.price).replace(/[^0-9.]/g, ''));
               if (!isNaN(numericPrice) && numericPrice > 0) {
@@ -149,6 +167,15 @@ export async function extractMetadataFromUrl(destinationUrl: string): Promise<Ex
         $('meta[name="twitter:description"]').attr('content') ||
         $('meta[name="description"]').attr('content') ||
         undefined;
+    }
+
+    if (!info.availability) {
+      info.availability = normalizeAvailability(
+        $('meta[property="product:availability"]').attr('content') ||
+          $('meta[property="og:availability"]').attr('content') ||
+          $('link[itemprop="availability"]').attr('href') ||
+          $('meta[itemprop="availability"]').attr('content')
+      );
     }
 
     // 3. Price Fallbacks from meta or common selectors

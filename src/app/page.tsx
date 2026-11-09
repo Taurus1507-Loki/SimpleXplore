@@ -12,11 +12,14 @@ import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE } from '@/lib/seo';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: { absolute: `${SITE_NAME} — ${SITE_TAGLINE} | Deals & Trending Products in India` },
-  description: SITE_DESCRIPTION,
-  alternates: { canonical: '/' },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const s = await db.getSettings();
+  return {
+    title: { absolute: `${s.site_name || SITE_NAME} — ${s.tagline || SITE_TAGLINE} | Deals & Trending Products in India` },
+    description: SITE_DESCRIPTION,
+    alternates: { canonical: '/' },
+  };
+}
 
 function ProductSection({
   id,

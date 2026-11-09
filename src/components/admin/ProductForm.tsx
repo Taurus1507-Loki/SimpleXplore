@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { Product, Category } from '@/types';
+import { Product, Category, ProductAvailability } from '@/types';
 import { formatPrice } from '@/lib/utils/formatters';
 import { Save, Globe, Eye, CheckCircle2, AlertCircle, UploadCloud, Plus, Trash2, Star, Image as ImageIcon } from 'lucide-react';
 
@@ -27,6 +27,7 @@ export default function ProductForm({ initialProduct, categories, prefill, sourc
   const [currency, setCurrency] = useState(seed?.currency || 'INR');
   const [discount, setDiscount] = useState<number | undefined>(seed?.discount || undefined);
   const [retailer, setRetailer] = useState(seed?.retailer || 'Amazon India');
+  const [availability, setAvailability] = useState<ProductAvailability | ''>(seed?.availability ?? '');
   const [categoryId, setCategoryId] = useState(seed?.category_id || categories[0]?.id || '');
   const [imageUrl, setImageUrl] = useState(seed?.image_url || '');
   const [additionalImages, setAdditionalImages] = useState<string[]>(
@@ -164,6 +165,7 @@ export default function ProductForm({ initialProduct, categories, prefill, sourc
       currency,
       discount,
       retailer,
+      availability: availability || null,
       category_id: categoryId,
       image_url: imageUrl.trim(),
       images: allImagesFormatted,
@@ -323,6 +325,21 @@ export default function ProductForm({ initialProduct, categories, prefill, sourc
                   <option value="Tata CLiQ Luxury">Tata CLiQ Luxury</option>
                   <option value="Ajio">Ajio</option>
                   <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="pf-availability" className="block font-semibold text-copy-primary mb-1">Availability</label>
+                <select
+                  id="pf-availability"
+                  value={availability}
+                  onChange={(e) => setAvailability(e.target.value as ProductAvailability | '')}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-surface-border focus:outline-none focus:border-brand-500 bg-white"
+                >
+                  <option value="">Unknown (not shown)</option>
+                  <option value="in_stock">In stock</option>
+                  <option value="limited">Limited stock</option>
+                  <option value="out_of_stock">Out of stock</option>
                 </select>
               </div>
 

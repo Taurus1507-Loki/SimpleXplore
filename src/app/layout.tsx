@@ -31,44 +31,38 @@ const sans = Figtree({
   display: 'swap',
 });
 
-export const metadata: Metadata = {
-  metadataBase: new URL(getSiteUrl()),
-  title: {
-    default: `${SITE_NAME} — ${SITE_TAGLINE}`,
-    template: `%s | ${SITE_NAME}`,
-  },
-  description: SITE_DESCRIPTION,
-  applicationName: SITE_NAME,
-  keywords: [
-    'shopping deals India',
-    'best price drops today',
-    'Amazon India deals',
-    'Flipkart offers',
-    'Myntra sale',
-    'trending products India',
-    'product discovery',
-  ],
-  openGraph: {
-    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
+/** Site-wide metadata follows Admin → Website Settings (brand name and tagline). */
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await db.getSettings();
+  const name = settings.site_name || SITE_NAME;
+  const tagline = settings.tagline || SITE_TAGLINE;
+  const full = `${name} — ${tagline}`;
+  return {
+    metadataBase: new URL(getSiteUrl()),
+    title: { default: full, template: `%s | ${name}` },
     description: SITE_DESCRIPTION,
-    siteName: SITE_NAME,
-    url: '/',
-    locale: 'en_IN',
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
-    description: SITE_DESCRIPTION,
-  },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 },
-  },
-  formatDetection: { telephone: false },
-  category: 'shopping',
-};
+    applicationName: name,
+    keywords: [
+      'shopping deals India',
+      'best price drops today',
+      'Amazon India deals',
+      'Flipkart offers',
+      'Myntra sale',
+      'trending products India',
+      'product discovery',
+    ],
+    openGraph: { title: full, description: SITE_DESCRIPTION, siteName: name, url: '/', locale: 'en_IN', type: 'website' },
+    twitter: { card: 'summary_large_image', title: full, description: SITE_DESCRIPTION },
+    icons: settings.logo_url ? { icon: settings.logo_url, apple: settings.logo_url } : undefined,
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 },
+    },
+    formatDetection: { telephone: false },
+    category: 'shopping',
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: '#106B36',
@@ -110,9 +104,18 @@ export default async function RootLayout({
         >
           Skip to content
         </a>
-        <JsonLd data={organizationJsonLd()} />
-        <JsonLd data={websiteJsonLd()} />
-        <Providers accountKey={initialEmail}>
+        <JsonLd data={organizationJsonLd({ name: settings.site_name || SITE_NAME, tagline: settings.tagline, logoUrl: settings.logo_url })} />
+        <JsonLd data={websiteJsonLd({ name: settings.site_name || SITE_NAME })} />
+        <Providers
+          accountKey={initialEmail}
+          site={{
+            siteName: settings.site_name || SITE_NAME,
+            tagline: settings.tagline ?? SITE_TAGLINE,
+            logoUrl: settings.logo_url || null,
+            contactEmail: settings.contact_email,
+            affiliateDisclosure: settings.affiliate_disclosure,
+          }}
+        >
           <Header initialEmail={initialEmail} initialIsAdmin={Boolean(adminSession)} />
           <main id="main-content" className="flex-1">
             {children}

@@ -33,24 +33,33 @@ export function truncate(text: string, max = 158): string {
   return clean.slice(0, max - 1).replace(/\s+\S*$/, '') + '…';
 }
 
-export function organizationJsonLd() {
+export interface Brand {
+  name: string;
+  tagline?: string;
+  logoUrl?: string | null;
+}
+
+const DEFAULT_BRAND: Brand = { name: SITE_NAME, tagline: SITE_TAGLINE };
+
+export function organizationJsonLd(brand: Brand = DEFAULT_BRAND) {
+  const logo = brand.logoUrl ? (brand.logoUrl.startsWith('http') ? brand.logoUrl : absoluteUrl(brand.logoUrl)) : absoluteUrl('/icon.svg');
   return {
     '@context': 'https://schema.org',
     '@type': 'Organization',
     '@id': `${getSiteUrl()}/#organization`,
-    name: SITE_NAME,
+    name: brand.name,
     url: getSiteUrl(),
-    logo: absoluteUrl('/icon.svg'),
-    slogan: SITE_TAGLINE,
+    logo,
+    ...(brand.tagline ? { slogan: brand.tagline } : {}),
   };
 }
 
-export function websiteJsonLd() {
+export function websiteJsonLd(brand: Brand = DEFAULT_BRAND) {
   return {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     '@id': `${getSiteUrl()}/#website`,
-    name: SITE_NAME,
+    name: brand.name,
     url: getSiteUrl(),
     inLanguage: 'en-IN',
     publisher: { '@id': `${getSiteUrl()}/#organization` },
@@ -106,6 +115,15 @@ export function productJsonLd(product: Product) {
             priceCurrency: product.currency,
             price: product.current_price,
             seller: { '@type': 'Organization', name: product.retailer },
+            ...(product.availability
+              ? {
+                  availability: {
+                    in_stock: 'https://schema.org/InStock',
+                    out_of_stock: 'https://schema.org/OutOfStock',
+                    limited: 'https://schema.org/LimitedAvailability',
+                  }[product.availability],
+                }
+              : {}),
           },
         }
       : {}),
