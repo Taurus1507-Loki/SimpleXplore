@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { TelegramWebhookUpdate, processTelegramPost } from '@/lib/telegram/service';
+import { TelegramWebhookUpdate, extractUrlsFromMessage, processTelegramPost } from '@/lib/telegram/service';
 import { safeEqual } from '@/lib/admin-session';
-
-// In-memory set of processed update IDs to ensure strict idempotency
-const processedUpdateIds = new Set<number>();
+import { db } from '@/lib/db';
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,30 +25,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid update payload' }, { status: 400 });
     }
 
-    // 2. Idempotency Check: Prevent duplicate processing
-    if (processedUpdateIds.has(payload.update_id)) {
+    const post = payload.channel_post ?? payload.edited_channel_post;
+    if (!post) {
+      // Nothing is imported for other update types, so there is nothing to de-duplicate.
+      return NextResponse.json({ ok: true, status: 'ignored_unsupported_update_type' });
+    }
+    const isEdited = !payload.channel_post;
+    const messageText = post.text || post.caption || null;
+
+    // 2. Idempotency: the UNIQUE update_id in telegram_updates (in-memory set in demo mode)
+    //    guarantees each update is processed at most once, across restarts and instances.
+    const claim = await db.claimTelegramUpdate({
+      update_id: payload.update_id,
+      channel_id: String(post.chat.id),
+      message_id: post.message_id,
+      message_text: messageText,
+      original_urls: extractUrlsFromMessage(messageText),
+    });
+    if (!claim.claimed) {
       return NextResponse.json({ ok: true, message: 'Update already processed' });
     }
-    processedUpdateIds.add(payload.update_id);
-    if (processedUpdateIds.size > 10000) {
-      // Keep memory bounded
-      const oldest = Array.from(processedUpdateIds).slice(0, 5000);
-      oldest.forEach(id => processedUpdateIds.delete(id));
-    }
 
-    // 3. Process new channel post
-    if (payload.channel_post) {
-      await processTelegramPost(payload.channel_post, payload.update_id, false);
-      return NextResponse.json({ ok: true, status: 'processed_channel_post' });
+    // 3. Process the channel post. Imports are always saved as pending drafts.
+    try {
+      await processTelegramPost(post, payload.update_id, isEdited);
+    } catch (err) {
+      await db.setTelegramUpdateStatus(payload.update_id, 'failed');
+      throw err;
     }
+    await db.setTelegramUpdateStatus(payload.update_id, 'processed');
 
-    // 4. Process edited channel post
-    if (payload.edited_channel_post) {
-      await processTelegramPost(payload.edited_channel_post, payload.update_id, true);
-      return NextResponse.json({ ok: true, status: 'processed_edited_channel_post' });
-    }
-
-    return NextResponse.json({ ok: true, status: 'ignored_unsupported_update_type' });
+    return NextResponse.json({
+      ok: true,
+      status: isEdited ? 'processed_edited_channel_post' : 'processed_channel_post',
+    });
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : String(error);
     console.error('Error handling Telegram webhook:', errMsg);
@@ -58,4 +66,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: errMsg }, { status: 200 });
   }
 }
-

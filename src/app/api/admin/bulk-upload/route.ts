@@ -81,9 +81,13 @@ export async function POST(req: NextRequest) {
         trending: String(row['Trending']).toLowerCase() === 'true',
         status: autoPublish ? 'published' : 'draft', // DRAFT by default per requirements
         source_type: 'bulk_upload',
+      }).catch((err: unknown) => {
+        // A database rejection (e.g. duplicate slug, price constraint) fails this row only.
+        failedRows.push({ row: rowNumber, reason: err instanceof Error ? err.message : String(err), data: row });
+        return null;
       });
 
-      successfulProducts.push(product);
+      if (product) successfulProducts.push(product);
     }
 
     return NextResponse.json({

@@ -1,14 +1,21 @@
 import React from 'react';
 import Link from 'next/link';
 import { db } from '@/lib/db';
-import { formatPrice } from '@/lib/utils/formatters';
 import { BarChart3, TrendingUp, Info, ExternalLink, ShieldCheck } from 'lucide-react';
 
 export const revalidate = 0;
 
 export default async function AdminAnalyticsPage() {
   const analytics = await db.getAnalytics();
-  const { products } = await db.getProducts({ status: 'published', limit: 8 });
+  const topProducts = analytics.clicksByProduct.slice(0, 10);
+  const recentDays = analytics.clicksByDate.slice(-14);
+  const maxDaily = Math.max(1, ...recentDays.map(d => d.clicks));
+  const sources = Object.entries(analytics.trafficSources).sort((a, b) => b[1] - a[1]);
+  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+  const clicksLast7Days = analytics.clicksByDate
+    .filter(d => d.date > weekAgo)
+    .reduce((sum, d) => sum + d.clicks, 0);
+  const retailerNames = Object.keys(analytics.clicksByRetailer);
 
   return (
     <div className="space-y-8 max-w-6xl">
@@ -47,7 +54,7 @@ export default async function AdminAnalyticsPage() {
           </div>
           <div className="text-[11px] text-brand-600 font-semibold flex items-center gap-1 pt-1">
             <TrendingUp className="w-3.5 h-3.5" />
-            <span>+14.2% vs previous period</span>
+            <span>{clicksLast7Days} in the last 7 days</span>
           </div>
         </div>
 
@@ -59,7 +66,7 @@ export default async function AdminAnalyticsPage() {
             {Object.keys(analytics.clicksByRetailer).length}
           </div>
           <div className="text-[11px] text-copy-muted pt-1">
-            Amazon, Flipkart, Myntra, Nykaa
+            {retailerNames.length > 0 ? retailerNames.join(', ') : 'No clicks recorded yet'}
           </div>
         </div>
 
@@ -103,55 +110,90 @@ export default async function AdminAnalyticsPage() {
         </div>
       </div>
 
+      {/* Daily clicks & traffic sources */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white p-6 rounded-3xl border border-surface-border shadow-soft-sm space-y-4">
+          <h3 className="text-base font-bold font-display text-copy-primary">Clicks by Day (UTC)</h3>
+          {recentDays.length === 0 ? (
+            <p className="text-xs text-copy-muted">No clicks recorded yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {recentDays.map(d => (
+                <li key={d.date} className="flex items-center gap-3 text-xs">
+                  <span className="w-20 text-copy-secondary tabular-nums">{d.date}</span>
+                  <div className="flex-1 h-2.5 bg-surface-border/60 rounded-full overflow-hidden">
+                    <div className="h-full bg-brand-500 rounded-full" style={{ width: `${Math.round((d.clicks / maxDaily) * 100)}%` }} />
+                  </div>
+                  <span className="w-10 text-right font-bold text-copy-primary tabular-nums">{d.clicks}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl border border-surface-border shadow-soft-sm space-y-4">
+          <h3 className="text-base font-bold font-display text-copy-primary">Traffic Sources</h3>
+          {sources.length === 0 ? (
+            <p className="text-xs text-copy-muted">No clicks recorded yet.</p>
+          ) : (
+            <ul className="divide-y divide-surface-border/60 text-xs">
+              {sources.map(([source, count]) => (
+                <li key={source} className="flex items-center justify-between py-2">
+                  <span className="text-copy-primary font-semibold">{source}</span>
+                  <span className="text-copy-secondary tabular-nums">
+                    {count} ({Math.round((count / (analytics.totalClicks || 1)) * 100)}%)
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
       {/* Top Performing Products Table */}
       <div className="bg-white rounded-3xl border border-surface-border shadow-soft-sm overflow-hidden p-6 space-y-4">
         <h3 className="text-base font-bold font-display text-copy-primary">
-          Most Popular Deal Destinations
+          Most Clicked Products
         </h3>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-surface-bg text-copy-secondary uppercase tracking-wider font-semibold border-y border-surface-border">
-              <tr>
-                <th className="py-3 px-4">Product Title</th>
-                <th className="py-3 px-4">Retailer</th>
-                <th className="py-3 px-4">Deal Price</th>
-                <th className="py-3 px-4">Discount</th>
-                <th className="py-3 px-4 text-right">Preview Link</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-border/60">
-              {products.map((p) => (
-                <tr key={p.id} className="hover:bg-surface-bg/40">
-                  <td className="py-3 px-4 font-bold text-copy-primary max-w-sm truncate">
-                    {p.title}
-                  </td>
-                  <td className="py-3 px-4 text-copy-secondary">
-                    {p.retailer}
-                  </td>
-                  <td className="py-3 px-4 font-bold text-copy-primary">
-                    {formatPrice(p.current_price, p.currency)}
-                  </td>
-                  <td className="py-3 px-4">
-                    {p.discount ? (
-                      <span className="text-brand-600 font-bold">{p.discount}% OFF</span>
-                    ) : '—'}
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    <Link
-                      href={`/products/${p.slug}`}
-                      target="_blank"
-                      className="inline-flex items-center gap-1 text-brand-600 hover:underline font-semibold"
-                    >
-                      <span>View</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </Link>
-                  </td>
+        {topProducts.length === 0 ? (
+          <p className="text-xs text-copy-muted">No clicks recorded yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-surface-bg text-copy-secondary uppercase tracking-wider font-semibold border-y border-surface-border">
+                <tr>
+                  <th className="py-3 px-4">Product Title</th>
+                  <th className="py-3 px-4">Retailer</th>
+                  <th className="py-3 px-4 text-right">Clicks</th>
+                  <th className="py-3 px-4 text-right">Edit</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-surface-border/60">
+                {topProducts.map((p) => (
+                  <tr key={p.productId} className="hover:bg-surface-bg/40">
+                    <td className="py-3 px-4 font-bold text-copy-primary max-w-sm truncate">
+                      {p.title ?? 'Deleted product'}
+                    </td>
+                    <td className="py-3 px-4 text-copy-secondary">{p.retailer ?? '—'}</td>
+                    <td className="py-3 px-4 text-right font-bold text-copy-primary tabular-nums">{p.clicks}</td>
+                    <td className="py-3 px-4 text-right">
+                      {p.title ? (
+                        <Link
+                          href={`/admin/products/${p.productId}/edit`}
+                          className="inline-flex items-center gap-1 text-brand-600 hover:underline font-semibold"
+                        >
+                          <span>Open</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </Link>
+                      ) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

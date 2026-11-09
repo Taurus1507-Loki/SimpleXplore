@@ -9,6 +9,10 @@ export function createAdminClient() {
       autoRefreshToken: false,
       persistSession: false,
     },
+    global: {
+      // Next.js caches fetch() by default; database reads must always be fresh
+      // (e.g. settings saved in the admin panel, new Telegram imports).
+      fetch: (input, init) => fetch(input, { ...init, cache: 'no-store' }),
+    },
   });
 }
-

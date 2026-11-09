@@ -186,8 +186,8 @@ export async function processTelegramPost(
         original_price: originalPrice,
         currency: 'INR',
         discount,
-        rating: extractedPayload.rating || 4.2,
-        review_count: extractedPayload.review_count || 50,
+        rating: extractedPayload.rating ?? null, // never invent ratings
+        review_count: extractedPayload.review_count ?? null,
         image_url: extractedPayload.image_url,
         affiliate_url: rawUrl, // Preserve original affiliate link posted in Telegram
         featured: false,

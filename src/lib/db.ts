@@ -241,6 +241,163 @@ export const initialSettings: WebsiteSettings = {
   updated_at: new Date().toISOString(),
 };
 
+// -----------------------------------------------------------------------------
+// SUPABASE HELPERS
+// -----------------------------------------------------------------------------
+type SupabaseAdmin = ReturnType<typeof createAdminClient>;
+type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Every primary/foreign key in the Supabase schema is a UUID. */
+export function isUuid(value: unknown): value is string {
+  return typeof value === 'string' && UUID_RE.test(value);
+}
+
+/** Columns of `public.products` that callers may write. Anything else is dropped. */
+const PRODUCT_WRITABLE_COLUMNS = [
+  'title', 'slug', 'description', 'highlights', 'category_id', 'retailer',
+  'current_price', 'original_price', 'currency', 'discount', 'rating', 'review_count',
+  'image_url', 'affiliate_url', 'featured', 'trending', 'status', 'source_type',
+  'seo_title', 'seo_description',
+] as const;
+
+/** Whitelists product fields for an insert/update. Non-UUID category ids (demo ids) become null. */
+export function toProductRow(input: Partial<Product>): Row {
+  const row: Row = {};
+  const src = input as Row;
+  for (const key of PRODUCT_WRITABLE_COLUMNS) {
+    if (src[key] !== undefined) row[key] = src[key];
+  }
+  if ('category_id' in row && row.category_id !== null && !isUuid(row.category_id)) {
+    row.category_id = null;
+  }
+  return row;
+}
+
+/** Columns of `public.website_settings` that admins may change. */
+const SETTINGS_WRITABLE_COLUMNS = [
+  'site_name', 'tagline', 'primary_color', 'default_currency', 'contact_email',
+  'social_links', 'affiliate_disclosure', 'homepage_config', 'telegram_config',
+] as const;
+
+function toSettingsRow(input: Partial<WebsiteSettings>): Row {
+  const row: Row = {};
+  const src = input as Row;
+  for (const key of SETTINGS_WRITABLE_COLUMNS) {
+    if (src[key] !== undefined) row[key] = src[key];
+  }
+  return row;
+}
+
+/** Fills NULL JSONB columns so the UI never reads properties of null. Scalar columns are NOT NULL in the schema. */
+function mapSettingsRow(row: Row): WebsiteSettings {
+  return {
+    ...(row as WebsiteSettings),
+    social_links: row.social_links ?? {},
+    homepage_config: row.homepage_config ?? initialSettings.homepage_config,
+    telegram_config: row.telegram_config ?? initialSettings.telegram_config,
+  };
+}
+
+function mapImportRow(row: Row): TelegramImport {
+  const { product, ...rest } = row;
+  return {
+    ...(rest as TelegramImport),
+    extracted_data: rest.extracted_data ?? {},
+    product: product ?? undefined,
+  };
+}
+
+function slugifyTitle(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+// -----------------------------------------------------------------------------
+// ANALYTICS
+// -----------------------------------------------------------------------------
+export interface ProductClickStat {
+  productId: string;
+  title: string | null;
+  retailer: string | null;
+  clicks: number;
+}
+
+export interface AnalyticsSummary {
+  totalProducts: number;
+  publishedProducts: number;
+  pendingDrafts: number;
+  totalTelegramImports: number;
+  pendingReviewImports: number;
+  totalClicks: number;
+  clicksByRetailer: Record<string, number>;
+  /** Sorted by clicks, highest first. */
+  clicksByProduct: ProductClickStat[];
+  /** One entry per UTC day that had clicks, oldest first. */
+  clicksByDate: { date: string; clicks: number }[];
+  /** Referrer hostname -> clicks. Clicks without a referrer count as "direct". */
+  trafficSources: Record<string, number>;
+  /** utm_campaign / ref value -> clicks. */
+  clicksByCampaign: Record<string, number>;
+}
+
+type ClickForStats = Pick<AffiliateClick, 'product_id' | 'retailer' | 'referrer' | 'campaign' | 'timestamp'>;
+
+export function trafficSourceOf(referrer?: string | null): string {
+  if (!referrer) return 'direct';
+  try {
+    return new URL(referrer).hostname.replace(/^www\./, '') || 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
+/** Pure aggregation over recorded clicks; shared by Supabase and demo mode. */
+export function aggregateClicks(
+  clicks: ClickForStats[],
+  titles: Map<string, string> = new Map()
+): Pick<AnalyticsSummary, 'totalClicks' | 'clicksByRetailer' | 'clicksByProduct' | 'clicksByDate' | 'trafficSources' | 'clicksByCampaign'> {
+  const clicksByRetailer: Record<string, number> = {};
+  const byProduct = new Map<string, ProductClickStat>();
+  const byDate: Record<string, number> = {};
+  const trafficSources: Record<string, number> = {};
+  const clicksByCampaign: Record<string, number> = {};
+
+  for (const c of clicks) {
+    if (c.retailer) clicksByRetailer[c.retailer] = (clicksByRetailer[c.retailer] || 0) + 1;
+
+    const stat = byProduct.get(c.product_id) ?? {
+      productId: c.product_id,
+      title: titles.get(c.product_id) ?? null,
+      retailer: c.retailer ?? null,
+      clicks: 0,
+    };
+    stat.clicks += 1;
+    byProduct.set(c.product_id, stat);
+
+    const day = c.timestamp ? new Date(c.timestamp).toISOString().slice(0, 10) : null;
+    if (day) byDate[day] = (byDate[day] || 0) + 1;
+
+    const source = trafficSourceOf(c.referrer);
+    trafficSources[source] = (trafficSources[source] || 0) + 1;
+
+    if (c.campaign) clicksByCampaign[c.campaign] = (clicksByCampaign[c.campaign] || 0) + 1;
+  }
+
+  return {
+    totalClicks: clicks.length,
+    clicksByRetailer,
+    clicksByProduct: Array.from(byProduct.values()).sort((a, b) => b.clicks - a.clicks),
+    clicksByDate: Object.entries(byDate)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, n]) => ({ date, clicks: n })),
+    trafficSources,
+    clicksByCampaign,
+  };
+}
+
+const SUPABASE_PAGE_SIZE = 1000; // PostgREST default max rows per request
+
 // In-Memory store for demo mode & dynamic state
 class DataRepository {
   private categories: Category[] = [...initialCategories];
@@ -249,6 +406,7 @@ class DataRepository {
   private affiliateClicks: AffiliateClick[] = [];
   private settings: WebsiteSettings = { ...initialSettings };
   private wishlists: Record<string, string[]> = {}; // userId -> productIds[]
+  private processedTelegramUpdates = new Set<number>(); // demo-mode webhook idempotency
 
   constructor() {
     // Add pending draft products from initial Telegram imports to the products table with status 'draft'
@@ -278,6 +436,11 @@ class DataRepository {
         });
       }
     }
+  }
+
+  /** Supabase client when real credentials are configured, otherwise null (demo mode). */
+  private supabase(): SupabaseAdmin | null {
+    return isSupabaseConfigured() ? createAdminClient() : null;
   }
 
   // --- CATEGORIES ---
@@ -380,8 +543,8 @@ class DataRepository {
 
     if (params?.search) {
       const query = params.search.toLowerCase();
-      list = list.filter(p => 
-        p.title.toLowerCase().includes(query) || 
+      list = list.filter(p =>
+        p.title.toLowerCase().includes(query) ||
         p.retailer.toLowerCase().includes(query) ||
         p.description?.toLowerCase().includes(query)
       );
@@ -442,6 +605,21 @@ class DataRepository {
   }
 
   async getProductById(id: string): Promise<Product | null> {
+    const sb = this.supabase();
+    if (sb) {
+      if (!isUuid(id)) return null; // would be a Postgres cast error
+      const { data, error } = await sb
+        .from('products')
+        .select('*, category:categories(*)')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) {
+        console.error('Supabase product lookup error:', error.message);
+        return null;
+      }
+      return (data as Product) ?? null;
+    }
+
     const found = this.products.find(p => p.id === id);
     if (!found) return null;
     return {
@@ -478,21 +656,40 @@ class DataRepository {
       updated_at: new Date().toISOString(),
     };
 
-    this.products.unshift(newProduct);
-
-    if (isSupabaseConfigured()) {
-      try {
-        const supabase = createAdminClient();
-        await supabase.from('products').insert(newProduct);
-      } catch (e) {
-        console.error('Supabase product insert error:', e);
+    const sb = this.supabase();
+    if (sb) {
+      // Let Postgres generate the UUID unless the caller supplied a valid one.
+      const row = toProductRow(newProduct);
+      if (isUuid(data.id)) row.id = data.id;
+      const { data: inserted, error } = await sb
+        .from('products')
+        .insert(row)
+        .select('*, category:categories(*)')
+        .single();
+      if (error || !inserted) {
+        throw new Error(`Failed to save product: ${error?.message ?? 'no row returned'}`);
       }
+      return inserted as Product;
     }
 
+    this.products.unshift(newProduct);
     return newProduct;
   }
 
   async updateProduct(id: string, updates: Partial<Product>): Promise<Product | null> {
+    const sb = this.supabase();
+    if (sb) {
+      if (!isUuid(id)) return null;
+      const { data, error } = await sb
+        .from('products')
+        .update({ ...toProductRow(updates), updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select('*, category:categories(*)')
+        .maybeSingle();
+      if (error) throw new Error(`Failed to update product: ${error.message}`);
+      return (data as Product) ?? null;
+    }
+
     const index = this.products.findIndex(p => p.id === id);
     if (index === -1) return null;
 
@@ -502,36 +699,108 @@ class DataRepository {
       updated_at: new Date().toISOString(),
     };
 
-    if (isSupabaseConfigured()) {
-      try {
-        const supabase = createAdminClient();
-        await supabase.from('products').update(updates).eq('id', id);
-      } catch (e) {
-        console.error('Supabase product update error:', e);
-      }
-    }
-
     return this.products[index];
   }
 
   async deleteProduct(id: string): Promise<boolean> {
+    const sb = this.supabase();
+    if (sb) {
+      if (!isUuid(id)) return false;
+      const { data, error } = await sb.from('products').delete().eq('id', id).select('id');
+      if (error) throw new Error(`Failed to delete product: ${error.message}`);
+      return (data?.length ?? 0) > 0;
+    }
+
     const index = this.products.findIndex(p => p.id === id);
     if (index === -1) return false;
     this.products.splice(index, 1);
-
-    if (isSupabaseConfigured()) {
-      try {
-        const supabase = createAdminClient();
-        await supabase.from('products').delete().eq('id', id);
-      } catch (e) {
-        console.error('Supabase product delete error:', e);
-      }
-    }
     return true;
+  }
+
+  // --- TELEGRAM UPDATES (webhook idempotency) ---
+
+  /**
+   * Records a Telegram update before it is processed. Returns `claimed: false` when this
+   * update_id was already seen, so retries/duplicate deliveries are never processed twice.
+   * In Supabase mode the guarantee comes from the UNIQUE constraint on telegram_updates.update_id.
+   */
+  async claimTelegramUpdate(update: {
+    update_id: number;
+    channel_id: string;
+    message_id: number;
+    message_text?: string | null;
+    original_urls?: string[];
+  }): Promise<{ claimed: boolean; id?: string }> {
+    const sb = this.supabase();
+    if (sb) {
+      const { data, error } = await sb
+        .from('telegram_updates')
+        .insert({
+          update_id: update.update_id,
+          channel_id: update.channel_id,
+          message_id: update.message_id,
+          message_text: update.message_text ?? null,
+          original_urls: update.original_urls ?? [],
+          processing_status: 'pending',
+        })
+        .select('id')
+        .single();
+      if (error) {
+        if (error.code === '23505') return { claimed: false }; // unique_violation: already seen
+        throw new Error(`Failed to record Telegram update: ${error.message}`);
+      }
+      return { claimed: true, id: data?.id };
+    }
+
+    if (this.processedTelegramUpdates.has(update.update_id)) return { claimed: false };
+    this.processedTelegramUpdates.add(update.update_id);
+    if (this.processedTelegramUpdates.size > 10000) {
+      // Keep memory bounded
+      Array.from(this.processedTelegramUpdates).slice(0, 5000).forEach(id => this.processedTelegramUpdates.delete(id));
+    }
+    return { claimed: true };
+  }
+
+  async setTelegramUpdateStatus(updateId: number, status: 'processed' | 'failed' | 'ignored'): Promise<void> {
+    const sb = this.supabase();
+    if (!sb) return;
+    const { error } = await sb.from('telegram_updates').update({ processing_status: status }).eq('update_id', updateId);
+    if (error) console.error('Failed to update Telegram update status:', error.message);
+  }
+
+  /** Accepts a telegram_updates UUID, or `upd-<update_id>` / `<update_id>` as produced by the Telegram service. */
+  private async resolveTelegramUpdateRef(sb: SupabaseAdmin, ref?: string | null): Promise<string | null> {
+    if (!ref) return null;
+    if (isUuid(ref)) return ref;
+    const match = /^(?:upd-)?(\d+)$/.exec(ref);
+    if (!match) return null;
+    const { data, error } = await sb
+      .from('telegram_updates')
+      .select('id')
+      .eq('update_id', Number(match[1]))
+      .maybeSingle();
+    if (error) {
+      console.error('Failed to resolve Telegram update reference:', error.message);
+      return null;
+    }
+    return data?.id ?? null;
   }
 
   // --- TELEGRAM IMPORTS ---
   async getTelegramImports(filter?: { review_status?: string; extraction_status?: string }): Promise<TelegramImport[]> {
+    const sb = this.supabase();
+    if (sb) {
+      let query = sb.from('telegram_imports').select('*, product:products(*)');
+      if (filter?.review_status && filter.review_status !== 'all') query = query.eq('review_status', filter.review_status);
+      if (filter?.extraction_status && filter.extraction_status !== 'all') query = query.eq('extraction_status', filter.extraction_status);
+      const { data, error } = await query.order('created_at', { ascending: false });
+      if (error) {
+        console.error('Supabase telegram imports query error:', error.message);
+        return [];
+      }
+      return (data ?? []).map(mapImportRow);
+    }
+
     let list = [...this.telegramImports];
     if (filter?.review_status && filter.review_status !== 'all') {
       list = list.filter(i => i.review_status === filter.review_status);
@@ -547,6 +816,21 @@ class DataRepository {
   }
 
   async getTelegramImportById(id: string): Promise<TelegramImport | null> {
+    const sb = this.supabase();
+    if (sb) {
+      if (!isUuid(id)) return null;
+      const { data, error } = await sb
+        .from('telegram_imports')
+        .select('*, product:products(*)')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) {
+        console.error('Supabase telegram import lookup error:', error.message);
+        return null;
+      }
+      return data ? mapImportRow(data) : null;
+    }
+
     const item = this.telegramImports.find(i => i.id === id);
     if (!item) return null;
     return {
@@ -556,6 +840,25 @@ class DataRepository {
   }
 
   async createTelegramImport(data: Partial<TelegramImport>): Promise<TelegramImport> {
+    const sb = this.supabase();
+    if (sb) {
+      const row = {
+        telegram_update_id: await this.resolveTelegramUpdateRef(sb, data.telegram_update_id),
+        product_id: isUuid(data.product_id) ? data.product_id : null,
+        original_url: data.original_url || '',
+        affiliate_url: data.affiliate_url || '',
+        extracted_data: data.extracted_data || {},
+        extraction_status: data.extraction_status || 'partial',
+        error_message: data.error_message || null,
+        review_status: 'pending', // Strictly pending! Imports are never auto-approved.
+      };
+      const { data: inserted, error } = await sb.from('telegram_imports').insert(row).select('*').single();
+      if (error || !inserted) {
+        throw new Error(`Failed to save Telegram import: ${error?.message ?? 'no row returned'}`);
+      }
+      return mapImportRow(inserted);
+    }
+
     const id = data.id || `tg-imp-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
     const newImport: TelegramImport = {
       id,
@@ -575,7 +878,94 @@ class DataRepository {
     return newImport;
   }
 
+  private async findCategoryIdByName(sb: SupabaseAdmin, name?: string): Promise<string | null> {
+    if (!name) return null;
+    const { data, error } = await sb.from('categories').select('id, name').ilike('name', name).limit(1);
+    if (error || !data || data.length === 0) return null;
+    return data[0].id ?? null;
+  }
+
+  /** Supabase implementation of the admin "Approve & Publish" action. */
+  private async approveAndPublishInSupabase(
+    sb: SupabaseAdmin,
+    importId: string,
+    editedData?: Partial<Product>
+  ): Promise<{ success: boolean; product?: Product; error?: string }> {
+    if (!isUuid(importId)) return { success: false, error: 'Telegram import record not found' };
+
+    const { data: item, error: fetchError } = await sb
+      .from('telegram_imports')
+      .select('*')
+      .eq('id', importId)
+      .maybeSingle();
+    if (fetchError) return { success: false, error: fetchError.message };
+    if (!item) return { success: false, error: 'Telegram import record not found' };
+
+    const extracted: TelegramImport['extracted_data'] = item.extracted_data ?? {};
+    let product: Product | null;
+
+    if (item.product_id) {
+      // Publish the existing draft, applying the admin's edits.
+      product = await this.updateProduct(item.product_id, { ...editedData, status: 'published' });
+      if (!product) return { success: false, error: 'Linked draft product no longer exists' };
+    } else {
+      // No draft yet (e.g. extraction failed). Only publish with real values: never invent them.
+      const title = editedData?.title || extracted.title;
+      const price = editedData?.current_price ?? extracted.price;
+      const imageUrl = editedData?.image_url || extracted.image_url;
+      const retailer = editedData?.retailer || extracted.retailer;
+      if (!title) return { success: false, error: 'A product title is required before publishing' };
+      if (price === undefined || price === null || !(Number(price) > 0)) {
+        return { success: false, error: 'A product price is required before publishing' };
+      }
+      if (!imageUrl) return { success: false, error: 'A product image is required before publishing' };
+      if (!retailer) return { success: false, error: 'A retailer is required before publishing' };
+
+      product = await this.createProduct({
+        title,
+        // Import id suffix keeps the slug unique and deterministic.
+        slug: editedData?.slug || `${slugifyTitle(title) || 'product'}-${importId.slice(0, 8)}`,
+        description: editedData?.description ?? extracted.description ?? null,
+        highlights: editedData?.highlights ?? extracted.highlights ?? [],
+        retailer,
+        current_price: Number(price),
+        original_price: editedData?.original_price ?? extracted.original_price ?? null,
+        discount: editedData?.discount ?? extracted.discount ?? null,
+        rating: editedData?.rating ?? extracted.rating ?? null,
+        review_count: editedData?.review_count ?? extracted.review_count ?? null,
+        currency: editedData?.currency || 'INR',
+        image_url: imageUrl,
+        // Keep the link exactly as posted in Telegram so affiliate tracking is preserved.
+        affiliate_url: editedData?.affiliate_url || item.original_url || item.affiliate_url,
+        category_id: editedData?.category_id ?? (await this.findCategoryIdByName(sb, extracted.category)),
+        seo_title: editedData?.seo_title ?? null,
+        seo_description: editedData?.seo_description ?? null,
+        status: 'published', // Admin explicitly clicked Approve & Publish
+        source_type: 'telegram',
+      });
+    }
+
+    const { error: updateError } = await sb
+      .from('telegram_imports')
+      .update({ review_status: 'approved', product_id: product.id, updated_at: new Date().toISOString() })
+      .eq('id', importId);
+    if (updateError) {
+      return { success: false, product, error: `Product published but import status not saved: ${updateError.message}` };
+    }
+
+    return { success: true, product };
+  }
+
   async approveAndPublishTelegramImport(importId: string, editedData?: Partial<Product>): Promise<{ success: boolean; product?: Product; error?: string }> {
+    const sb = this.supabase();
+    if (sb) {
+      try {
+        return await this.approveAndPublishInSupabase(sb, importId, editedData);
+      } catch (e) {
+        return { success: false, error: e instanceof Error ? e.message : String(e) };
+      }
+    }
+
     const itemIndex = this.telegramImports.findIndex(i => i.id === importId);
     if (itemIndex === -1) {
       return { success: false, error: 'Telegram import record not found' };
@@ -619,6 +1009,21 @@ class DataRepository {
   }
 
   async rejectTelegramImport(importId: string): Promise<boolean> {
+    const sb = this.supabase();
+    if (sb) {
+      if (!isUuid(importId)) return false;
+      const { data, error } = await sb
+        .from('telegram_imports')
+        .update({ review_status: 'rejected', updated_at: new Date().toISOString() })
+        .eq('id', importId)
+        .select('id');
+      if (error) {
+        console.error('Supabase telegram import reject error:', error.message);
+        return false;
+      }
+      return (data?.length ?? 0) > 0;
+    }
+
     const itemIndex = this.telegramImports.findIndex(i => i.id === importId);
     if (itemIndex === -1) return false;
     this.telegramImports[itemIndex].review_status = 'rejected';
@@ -646,35 +1051,58 @@ class DataRepository {
       user_agent: data.userAgent || null,
     };
 
-    this.affiliateClicks.unshift(click);
-
-    if (isSupabaseConfigured()) {
-      try {
-        const supabase = createAdminClient();
-        await supabase.from('affiliate_clicks').insert(click);
-      } catch (e) {
-        console.error('Supabase click tracking error:', e);
+    const sb = this.supabase();
+    if (sb) {
+      // id is generated by Postgres (UUID).
+      const { id: _localId, ...row } = click; // eslint-disable-line @typescript-eslint/no-unused-vars
+      const { data: inserted, error } = await sb.from('affiliate_clicks').insert(row).select('id').single();
+      if (error) {
+        console.error('Supabase click tracking error:', error.message);
+        return click;
       }
+      return { ...click, id: inserted?.id ?? click.id };
     }
 
+    this.affiliateClicks.unshift(click);
     return click;
   }
 
-  async getAnalytics() {
-    const totalProducts = this.products.length;
-    const publishedProducts = this.products.filter(p => p.status === 'published').length;
-    const pendingDrafts = this.products.filter(p => p.status === 'draft').length;
-    const totalTelegramImports = this.telegramImports.length;
-    const pendingReviewImports = this.telegramImports.filter(i => i.review_status === 'pending').length;
-    const totalClicks = this.affiliateClicks.length;
+  private async getAnalyticsFromSupabase(sb: SupabaseAdmin): Promise<AnalyticsSummary> {
+    const countRows = async (table: string, column?: string, value?: string): Promise<number> => {
+      let query = sb.from(table).select('id', { count: 'exact', head: true });
+      if (column) query = query.eq(column, value);
+      const { count, error } = await query;
+      if (error) throw new Error(`Failed to count ${table}: ${error.message}`);
+      return count ?? 0;
+    };
 
-    // Retailer breakdown
-    const clicksByRetailer: Record<string, number> = {};
+    const [totalProducts, publishedProducts, pendingDrafts, totalTelegramImports, pendingReviewImports] = await Promise.all([
+      countRows('products'),
+      countRows('products', 'status', 'published'),
+      countRows('products', 'status', 'draft'),
+      countRows('telegram_imports'),
+      countRows('telegram_imports', 'review_status', 'pending'),
+    ]);
 
-    for (const c of this.affiliateClicks) {
-      if (c.retailer) {
-        clicksByRetailer[c.retailer] = (clicksByRetailer[c.retailer] || 0) + 1;
-      }
+    // Page through every recorded click (PostgREST caps rows per request).
+    const clicks: ClickForStats[] = [];
+    for (let from = 0; ; from += SUPABASE_PAGE_SIZE) {
+      const { data, error } = await sb
+        .from('affiliate_clicks')
+        .select('product_id, retailer, referrer, campaign, timestamp')
+        .order('timestamp', { ascending: true })
+        .range(from, from + SUPABASE_PAGE_SIZE - 1);
+      if (error) throw new Error(`Failed to load affiliate clicks: ${error.message}`);
+      clicks.push(...((data ?? []) as ClickForStats[]));
+      if (!data || data.length < SUPABASE_PAGE_SIZE) break;
+    }
+
+    const titles = new Map<string, string>();
+    const productIds = Array.from(new Set(clicks.map(c => c.product_id)));
+    for (let i = 0; i < productIds.length; i += 200) {
+      const { data, error } = await sb.from('products').select('id, title').in('id', productIds.slice(i, i + 200));
+      if (error) throw new Error(`Failed to load product titles: ${error.message}`);
+      for (const p of data ?? []) titles.set(p.id, p.title);
     }
 
     return {
@@ -683,17 +1111,68 @@ class DataRepository {
       pendingDrafts,
       totalTelegramImports,
       pendingReviewImports,
-      totalClicks,
-      clicksByRetailer,
+      ...aggregateClicks(clicks, titles),
+    };
+  }
+
+  async getAnalytics(): Promise<AnalyticsSummary> {
+    const sb = this.supabase();
+    // Errors propagate: showing zeros when the database is unreachable would misreport real traffic.
+    if (sb) return this.getAnalyticsFromSupabase(sb);
+
+    const titles = new Map(this.products.map(p => [p.id, p.title] as [string, string]));
+    return {
+      totalProducts: this.products.length,
+      publishedProducts: this.products.filter(p => p.status === 'published').length,
+      pendingDrafts: this.products.filter(p => p.status === 'draft').length,
+      totalTelegramImports: this.telegramImports.length,
+      pendingReviewImports: this.telegramImports.filter(i => i.review_status === 'pending').length,
+      ...aggregateClicks(this.affiliateClicks, titles),
     };
   }
 
   // --- SETTINGS ---
   async getSettings(): Promise<WebsiteSettings> {
+    const sb = this.supabase();
+    if (sb) {
+      try {
+        const { data, error } = await sb
+          .from('website_settings')
+          .select('*')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (error) throw new Error(error.message);
+        // No row yet: the schema's column defaults are the same as initialSettings.
+        return data ? mapSettingsRow(data) : this.settings;
+      } catch (e) {
+        // Settings are read by the root layout; never take the whole site down over them.
+        console.error('Supabase settings read error, using defaults:', e);
+        return this.settings;
+      }
+    }
     return this.settings;
   }
 
   async updateSettings(newSettings: Partial<WebsiteSettings>): Promise<WebsiteSettings> {
+    const sb = this.supabase();
+    if (sb) {
+      const row = { ...toSettingsRow(newSettings), updated_at: new Date().toISOString() };
+      const { data: existing, error: readError } = await sb
+        .from('website_settings')
+        .select('id')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (readError) throw new Error(`Failed to read settings: ${readError.message}`);
+
+      const { data, error } = existing
+        ? await sb.from('website_settings').update(row).eq('id', existing.id).select('*').single()
+        : await sb.from('website_settings').insert(row).select('*').single();
+      if (error || !data) throw new Error(`Failed to save settings: ${error?.message ?? 'no row returned'}`);
+      return mapSettingsRow(data);
+    }
+
     this.settings = {
       ...this.settings,
       ...newSettings,
@@ -704,4 +1183,3 @@ class DataRepository {
 }
 
 export const db = new DataRepository();
-
