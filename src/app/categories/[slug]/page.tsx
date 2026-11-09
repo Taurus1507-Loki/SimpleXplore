@@ -5,6 +5,8 @@ import { db } from '@/lib/db';
 import ProductGrid from '@/components/ProductGrid';
 import { ArrowLeft } from 'lucide-react';
 
+export const dynamic = 'force-dynamic';
+
 interface CategoryDetailPageProps {
   params: {
     slug: string;

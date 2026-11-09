@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { db } from '@/lib/db';
 import { ArrowRight, Layers } from 'lucide-react';
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 export default async function CategoriesPage() {
   const categories = await db.getCategories();

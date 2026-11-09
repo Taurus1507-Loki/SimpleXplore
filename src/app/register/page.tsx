@@ -36,7 +36,7 @@ export default function RegisterPage() {
       if (signUpError) {
         if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true' || signUpError.message.includes('placeholder')) {
           document.cookie = `sx_user_email=${encodeURIComponent(email.trim())}; path=/; max-age=86400`;
-          router.push('/wishlist');
+          router.push('/products');
           router.refresh();
           return;
         }
@@ -46,7 +46,7 @@ export default function RegisterPage() {
       }
 
       document.cookie = `sx_user_email=${encodeURIComponent(email.trim())}; path=/; max-age=86400`;
-      router.push('/wishlist');
+      router.push('/products');
       router.refresh();
     } catch {
       setError('An error occurred during registration.');

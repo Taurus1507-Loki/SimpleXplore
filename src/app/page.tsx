@@ -6,7 +6,7 @@ import CategoryBar from '@/components/CategoryBar';
 import ProductGrid from '@/components/ProductGrid';
 import { Flame, Percent, Sparkles, Clock, ArrowRight } from 'lucide-react';
 
-export const revalidate = 60; // ISR cache revalidation
+export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   const categories = await db.getCategories();

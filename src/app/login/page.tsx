@@ -50,7 +50,7 @@ function LoginForm() {
             return;
           } else {
             document.cookie = `sx_user_email=${encodeURIComponent(trimmedEmail)}; path=/; max-age=86400`;
-            router.push('/wishlist');
+            router.push('/products');
             router.refresh();
             return;
           }
@@ -68,7 +68,7 @@ function LoginForm() {
         document.cookie = 'sx_admin_demo=true; path=/; max-age=86400';
         router.push('/admin');
       } else {
-        router.push('/wishlist');
+        router.push('/products');
       }
       router.refresh();
     } catch {

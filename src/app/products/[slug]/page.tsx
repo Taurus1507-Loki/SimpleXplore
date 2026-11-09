@@ -17,6 +17,8 @@ import {
 import ProductGrid from '@/components/ProductGrid';
 import ProductActions from './ProductActions';
 
+export const dynamic = 'force-dynamic';
+
 interface ProductDetailPageProps {
   params: {
     slug: string;

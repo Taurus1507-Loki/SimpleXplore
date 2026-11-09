@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 import ProductGrid from '@/components/ProductGrid';
 import { Flame } from 'lucide-react';
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 export default async function TrendingPage() {
   const { products } = await db.getProducts({
