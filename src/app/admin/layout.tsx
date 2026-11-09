@@ -65,7 +65,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               <ShieldCheck className="w-3.5 h-3.5" />
               Role: Master Admin
             </span>
-            <span className="text-copy-muted hidden sm:inline">simplore01@gmail.com</span>
+            <span className="text-copy-muted hidden sm:inline">Administrator</span>
             <div className="h-4 w-[1px] bg-surface-border hidden sm:block" />
             <AdminHeaderActions />
           </div>

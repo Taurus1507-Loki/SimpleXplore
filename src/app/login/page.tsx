@@ -17,7 +17,7 @@ function LoginForm() {
 
   useEffect(() => {
     if (searchParams.get('error') === 'unauthorized') {
-      setError('Access restricted: You must be signed in as simplore01@gmail.com to access the Admin Hub.');
+      setError('Access restricted: You must be signed in as an administrator to access the Admin Hub.');
     }
   }, [searchParams]);
 
