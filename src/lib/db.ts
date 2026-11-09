@@ -475,6 +475,7 @@ class DataRepository {
       source_type: data.source_type || 'manual',
       seo_title: data.seo_title || null,
       seo_description: data.seo_description || null,
+      images: data.images || [],
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };

@@ -44,7 +44,8 @@ export default function ProductCatalogClient({
     return Math.max(...initialProducts.map(p => p.current_price), 10000);
   }, [initialProducts]);
 
-  const [priceLimit, setPriceLimit] = useState<number>(maxProductPrice);
+  const [minPrice, setMinPrice] = useState<number>(0);
+  const [maxPrice, setMaxPrice] = useState<number>(maxProductPrice);
 
   const retailers = useMemo(() => {
     const set = new Set<string>();
@@ -68,8 +69,8 @@ export default function ProductCatalogClient({
         return false;
       }
 
-      // Price limit filter
-      if (p.current_price > priceLimit) {
+      // Price limit filter (min and max)
+      if (p.current_price < minPrice || p.current_price > maxPrice) {
         return false;
       }
 
@@ -105,7 +106,8 @@ export default function ProductCatalogClient({
     categories, 
     selectedCategory, 
     selectedRetailer, 
-    priceLimit, 
+    minPrice,
+    maxPrice, 
     minDiscount, 
     minRating, 
     searchQuery, 
@@ -118,7 +120,8 @@ export default function ProductCatalogClient({
     setSearchQuery('');
     setMinDiscount(0);
     setMinRating(0);
-    setPriceLimit(maxProductPrice);
+    setMinPrice(0);
+    setMaxPrice(maxProductPrice);
     setSortBy('newest');
   };
 
@@ -128,7 +131,8 @@ export default function ProductCatalogClient({
     searchQuery !== '' || 
     minDiscount > 0 || 
     minRating > 0 || 
-    priceLimit < maxProductPrice;
+    minPrice > 0 ||
+    maxPrice < maxProductPrice;
 
   return (
     <div className="space-y-6">
@@ -238,21 +242,75 @@ export default function ProductCatalogClient({
             </div>
           </div>
 
-          {/* Maximum Price Filter */}
-          <div className="space-y-2 pt-3 border-t border-surface-border/60">
+          {/* Price Range Filter (Min & Max Inputs + Slider) */}
+          <div className="space-y-3 pt-3 border-t border-surface-border/60">
             <div className="flex items-center justify-between text-xs">
-              <label className="font-bold text-copy-primary uppercase tracking-wider">Max Price</label>
-              <span className="font-bold text-brand-700">{formatPrice(priceLimit, 'INR')}</span>
+              <label className="font-bold text-copy-primary uppercase tracking-wider">Price Range</label>
+              {(minPrice > 0 || maxPrice < maxProductPrice) && (
+                <span className="text-[10px] font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded-full border border-brand-200">
+                  Active
+                </span>
+              )}
             </div>
-            <input
-              type="range"
-              min={500}
-              max={maxProductPrice}
-              step={500}
-              value={priceLimit}
-              onChange={(e) => setPriceLimit(Number(e.target.value))}
-              className="w-full accent-brand-500 cursor-pointer"
-            />
+
+            {/* Min and Max Inputs */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <span className="text-[10px] text-copy-muted font-bold uppercase tracking-wider">Min Price</span>
+                <div className="relative mt-1">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-copy-muted font-bold">₹</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={maxPrice}
+                    step={100}
+                    placeholder="0"
+                    value={minPrice === 0 ? '' : minPrice}
+                    onChange={(e) => {
+                      const val = Number(e.target.value) || 0;
+                      setMinPrice(Math.max(0, val));
+                    }}
+                    className="w-full pl-6 pr-2 py-1.5 text-xs font-semibold rounded-xl border border-surface-border bg-surface-bg focus:outline-none focus:border-brand-500 text-copy-primary"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <span className="text-[10px] text-copy-muted font-bold uppercase tracking-wider">Max Price</span>
+                <div className="relative mt-1">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-copy-muted font-bold">₹</span>
+                  <input
+                    type="number"
+                    min={minPrice}
+                    step={100}
+                    placeholder={maxProductPrice.toString()}
+                    value={maxPrice === maxProductPrice ? '' : maxPrice}
+                    onChange={(e) => {
+                      const val = e.target.value === '' ? maxProductPrice : Number(e.target.value) || 0;
+                      setMaxPrice(Math.max(minPrice, val));
+                    }}
+                    className="w-full pl-6 pr-2 py-1.5 text-xs font-semibold rounded-xl border border-surface-border bg-surface-bg focus:outline-none focus:border-brand-500 text-copy-primary"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Slider */}
+            <div className="space-y-1 pt-1">
+              <input
+                type="range"
+                min={0}
+                max={maxProductPrice}
+                step={500}
+                value={maxPrice}
+                onChange={(e) => setMaxPrice(Math.max(minPrice, Number(e.target.value)))}
+                className="w-full accent-brand-500 cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] text-copy-muted font-semibold">
+                <span>{formatPrice(minPrice, 'INR')}</span>
+                <span>{formatPrice(maxPrice, 'INR')}</span>
+              </div>
+            </div>
           </div>
 
           {/* Minimum Discount Filter */}

@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import { WebsiteSettings } from '@/types';
-import { Save, CheckCircle2, Settings } from 'lucide-react';
+import { Save, CheckCircle2, Settings, Palette } from 'lucide-react';
+import { applyThemeColors } from '@/lib/utils/colors';
 
 export default function SettingsClient({ initialSettings }: { initialSettings: WebsiteSettings }) {
   const [siteName, setSiteName] = useState(initialSettings.site_name);
@@ -17,6 +18,13 @@ export default function SettingsClient({ initialSettings }: { initialSettings: W
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  const handleColorChange = (color: string) => {
+    setPrimaryColor(color);
+    if (/^#[0-9A-Fa-f]{6}$/.test(color)) {
+      applyThemeColors(color);
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,20 +96,45 @@ export default function SettingsClient({ initialSettings }: { initialSettings: W
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block font-semibold text-copy-primary mb-1">Primary Brand Color</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block font-semibold text-copy-primary">Primary Brand Color</label>
+              <span className="text-[11px] text-brand-600 font-bold">Applies Live</span>
+            </div>
             <div className="flex items-center gap-2">
               <input
                 type="color"
                 value={primaryColor}
-                onChange={(e) => setPrimaryColor(e.target.value)}
-                className="w-10 h-10 rounded-xl border border-surface-border cursor-pointer"
+                onChange={(e) => handleColorChange(e.target.value)}
+                className="w-10 h-10 rounded-xl border border-surface-border cursor-pointer p-0.5 bg-white"
               />
               <input
                 type="text"
                 value={primaryColor}
-                onChange={(e) => setPrimaryColor(e.target.value)}
-                className="flex-1 px-3.5 py-2.5 rounded-xl border border-surface-border font-mono text-xs uppercase"
+                onChange={(e) => handleColorChange(e.target.value)}
+                className="flex-1 px-3.5 py-2.5 rounded-xl border border-surface-border font-mono text-xs uppercase focus:outline-none focus:border-brand-500 font-bold"
               />
+            </div>
+
+            {/* Quick Preset Colors */}
+            <div className="flex items-center gap-1.5 mt-2">
+              <span className="text-[10px] text-copy-muted font-bold uppercase">Presets:</span>
+              {[
+                { name: 'Emerald', hex: '#168A45' },
+                { name: 'Royal Blue', hex: '#2563EB' },
+                { name: 'Indigo', hex: '#4F46E5' },
+                { name: 'Purple', hex: '#9333EA' },
+                { name: 'Crimson', hex: '#E11D48' },
+                { name: 'Teal', hex: '#0D9488' },
+              ].map((c) => (
+                <button
+                  key={c.hex}
+                  type="button"
+                  title={c.name}
+                  onClick={() => handleColorChange(c.hex)}
+                  className="w-5 h-5 rounded-full border border-black/10 hover:scale-110 transition-transform shadow-xs"
+                  style={{ backgroundColor: c.hex }}
+                />
+              ))}
             </div>
           </div>
 

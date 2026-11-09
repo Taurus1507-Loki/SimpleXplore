@@ -56,16 +56,30 @@ export default function RegisterPage() {
 
   return (
     <div className="max-w-md mx-auto px-4 py-16 space-y-6">
-      <div className="text-center space-y-2">
-        <div className="w-12 h-12 rounded-2xl bg-brand-50 text-brand-600 mx-auto flex items-center justify-center font-bold text-xl">
-          S
+      <div className="text-center space-y-3">
+        <Link href="/" className="inline-flex flex-col items-center group">
+          <div className="flex items-center gap-2.5">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-black text-2xl shadow-soft-md group-hover:scale-105 transition-transform duration-200">
+              S
+            </div>
+            <div className="text-left">
+              <span className="font-display font-black text-2xl tracking-tight text-copy-primary">
+                Simple<span className="text-brand-500">Xplore</span>
+              </span>
+              <span className="block text-[10px] uppercase tracking-wider text-copy-secondary font-semibold -mt-1">
+                Shop Smart • Explore More
+              </span>
+            </div>
+          </div>
+        </Link>
+        <div>
+          <h1 className="text-2xl font-black font-display text-copy-primary">
+            Create Customer Account
+          </h1>
+          <p className="text-xs text-copy-secondary mt-1">
+            Save favorite deals and sync your shopping wishlist
+          </p>
         </div>
-        <h1 className="text-2xl font-black font-display text-copy-primary">
-          Create Customer Account
-        </h1>
-        <p className="text-xs text-copy-secondary">
-          Save favorite affiliate deals and sync your shopping wishlist
-        </p>
       </div>
 
       <div className="bg-white p-8 rounded-3xl border border-surface-border shadow-soft-sm space-y-5">

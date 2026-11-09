@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Product, Category } from '@/types';
 import { formatPrice } from '@/lib/utils/formatters';
-import { Save, Globe, Eye, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Save, Globe, Eye, CheckCircle2, AlertCircle, UploadCloud, Plus, Trash2, Star, Image as ImageIcon } from 'lucide-react';
 
 interface ProductFormProps {
   initialProduct?: Product;
@@ -24,6 +24,12 @@ export default function ProductForm({ initialProduct, categories }: ProductFormP
   const [retailer, setRetailer] = useState(initialProduct?.retailer || 'Amazon India');
   const [categoryId, setCategoryId] = useState(initialProduct?.category_id || categories[0]?.id || 'cat-electronics');
   const [imageUrl, setImageUrl] = useState(initialProduct?.image_url || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800');
+  const [additionalImages, setAdditionalImages] = useState<string[]>(
+    (initialProduct?.images || [])
+      .map(img => img.image_url)
+      .filter(url => url && url !== initialProduct?.image_url)
+  );
+  const [urlInput, setUrlInput] = useState('');
   const [affiliateUrl, setAffiliateUrl] = useState(initialProduct?.affiliate_url || '');
   const [description, setDescription] = useState(initialProduct?.description || '');
   const [highlightsText, setHighlightsText] = useState((initialProduct?.highlights || []).join('\n'));
@@ -37,6 +43,57 @@ export default function ProductForm({ initialProduct, categories }: ProductFormP
 
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const handleAddUrl = () => {
+    if (!urlInput.trim()) return;
+    const cleanUrl = urlInput.trim();
+    if (!imageUrl) {
+      setImageUrl(cleanUrl);
+    } else if (!additionalImages.includes(cleanUrl) && cleanUrl !== imageUrl) {
+      setAdditionalImages(prev => [...prev, cleanUrl]);
+    }
+    setUrlInput('');
+  };
+
+  const handleRemoveAdditionalImage = (index: number) => {
+    setAdditionalImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSetPrimary = (index: number) => {
+    const selected = additionalImages[index];
+    const oldPrimary = imageUrl;
+    setImageUrl(selected);
+    setAdditionalImages(prev => {
+      const next = [...prev];
+      if (oldPrimary) {
+        next[index] = oldPrimary;
+      } else {
+        next.splice(index, 1);
+      }
+      return next;
+    });
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        if (dataUrl) {
+          setImageUrl((curr) => {
+            if (!curr) return dataUrl;
+            setAdditionalImages((prev) => [...prev, dataUrl]);
+            return curr;
+          });
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  };
 
   const handlePriceChange = (val: number) => {
     setCurrentPrice(val);
@@ -66,6 +123,16 @@ export default function ProductForm({ initialProduct, categories }: ProductFormP
       .map(h => h.trim())
       .filter(h => h.length > 0);
 
+    const allImagesFormatted = [
+      ...(imageUrl.trim() ? [{ id: `img-primary-${Date.now()}`, product_id: initialProduct?.id || '', image_url: imageUrl.trim(), sort_order: 0 }] : []),
+      ...additionalImages.map((img, idx) => ({
+        id: `img-add-${Date.now()}-${idx}`,
+        product_id: initialProduct?.id || '',
+        image_url: img.trim(),
+        sort_order: idx + 1,
+      })),
+    ];
+
     const payload = {
       id: initialProduct?.id,
       title: title.trim(),
@@ -77,6 +144,7 @@ export default function ProductForm({ initialProduct, categories }: ProductFormP
       retailer,
       category_id: categoryId,
       image_url: imageUrl.trim(),
+      images: allImagesFormatted,
       affiliate_url: affiliateUrl.trim(),
       description: description.trim() || null,
       highlights,
@@ -247,15 +315,129 @@ export default function ProductForm({ initialProduct, categories }: ProductFormP
               </div>
             </div>
 
-            <div>
-              <label className="block font-semibold text-copy-primary mb-1">Product Image URL</label>
-              <input
-                type="url"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="https://..."
-                className="w-full px-3.5 py-2.5 rounded-xl border border-surface-border focus:outline-none focus:border-brand-500 font-mono text-xs"
-              />
+            {/* Multi-Image Upload & Management */}
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="block font-semibold text-copy-primary">
+                    Product Showcase Images
+                  </label>
+                  <p className="text-[11px] text-copy-secondary">
+                    Add multiple photos from your device or online URLs. The primary photo is displayed on store cards.
+                  </p>
+                </div>
+                <span className="text-xs font-bold text-brand-700 bg-brand-50 px-2.5 py-1 rounded-full border border-brand-200">
+                  {1 + additionalImages.length} Image{1 + additionalImages.length === 1 ? '' : 's'}
+                </span>
+              </div>
+
+              {/* Upload & Add URL controls */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-surface-bg rounded-2xl border border-surface-border">
+                {/* File Upload Button */}
+                <div>
+                  <label className="block text-[11px] font-bold text-copy-primary uppercase mb-1">
+                    Upload from Computer
+                  </label>
+                  <label className="flex items-center justify-center gap-2 px-3 py-2 bg-white hover:bg-brand-50 border border-dashed border-brand-300 hover:border-brand-500 rounded-xl cursor-pointer text-xs font-semibold text-brand-700 transition-colors shadow-soft-sm">
+                    <UploadCloud className="w-4 h-4 text-brand-600" />
+                    <span>Choose Multiple Images</span>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                {/* Direct Image URL input */}
+                <div>
+                  <label className="block text-[11px] font-bold text-copy-primary uppercase mb-1">
+                    Or Add Image URL
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={urlInput}
+                      onChange={(e) => setUrlInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddUrl();
+                        }
+                      }}
+                      placeholder="https://images.unsplash.com/..."
+                      className="flex-1 px-3 py-1.5 text-xs rounded-xl border border-surface-border focus:outline-none focus:border-brand-500 font-mono bg-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddUrl}
+                      className="px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-semibold flex items-center gap-1 shadow-sm transition-all"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Visual Gallery Preview Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pt-2">
+                {/* Primary Image Card */}
+                {imageUrl && (
+                  <div className="relative group rounded-2xl border-2 border-brand-500 bg-white p-2 flex flex-col items-center justify-between shadow-soft-sm">
+                    <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-[#F3F5F3]">
+                      <Image
+                        src={imageUrl}
+                        alt="Primary product photo"
+                        fill
+                        className="object-contain p-1"
+                      />
+                    </div>
+                    <div className="w-full mt-2 flex items-center justify-between text-[10px]">
+                      <span className="bg-brand-500 text-white font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <Star className="w-2.5 h-2.5 fill-white" /> Primary
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Additional Images Cards */}
+                {additionalImages.map((img, idx) => (
+                  <div
+                    key={idx}
+                    className="relative group rounded-2xl border border-surface-border hover:border-brand-300 bg-white p-2 flex flex-col items-center justify-between transition-all"
+                  >
+                    <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-[#F3F5F3]">
+                      <Image
+                        src={img}
+                        alt={`Product image ${idx + 2}`}
+                        fill
+                        className="object-contain p-1"
+                      />
+                    </div>
+                    <div className="w-full mt-2 flex items-center justify-between text-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => handleSetPrimary(idx)}
+                        className="text-brand-700 hover:underline font-semibold"
+                        title="Set as main display image"
+                      >
+                        Set Primary
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAdditionalImage(idx)}
+                        className="text-rose-600 hover:text-rose-800 p-1"
+                        title="Remove image"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div>

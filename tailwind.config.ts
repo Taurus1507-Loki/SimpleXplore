@@ -10,16 +10,16 @@ const config: Config = {
     extend: {
       colors: {
         brand: {
-          50: "#F0F9F3",
-          100: "#DBF1E2",
-          200: "#B8E3C6",
-          300: "#86CEA1",
-          400: "#4DB376",
-          500: "#168A45", // Primary green
-          600: "#106B36", // Dark green
-          700: "#0D532B",
-          800: "#0B4223",
-          900: "#09371E",
+          50: "var(--brand-50, #F0F9F3)",
+          100: "var(--brand-100, #DBF1E2)",
+          200: "var(--brand-200, #B8E3C6)",
+          300: "var(--brand-300, #86CEA1)",
+          400: "var(--brand-400, #4DB376)",
+          500: "var(--brand-500, #168A45)",
+          600: "var(--brand-600, #106B36)",
+          700: "var(--brand-700, #0D532B)",
+          800: "var(--brand-800, #0B4223)",
+          900: "var(--brand-900, #09371E)",
         },
         surface: {
           bg: "#F7F9F7",

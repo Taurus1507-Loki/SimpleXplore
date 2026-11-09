@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import ProductGrid from '@/components/ProductGrid';
 import ProductActions from './ProductActions';
+import ProductImageGallery from '@/components/ProductImageGallery';
 
 export const dynamic = 'force-dynamic';
 
@@ -120,22 +121,12 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
       {/* Main Product Showcase Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 bg-white rounded-3xl p-6 sm:p-8 border border-surface-border shadow-soft-sm">
         {/* Left: Product Image Showcase (5 cols) */}
-        <div className="lg:col-span-5 space-y-4">
-          <div className="relative aspect-square w-full rounded-2xl bg-[#F8FAF8] border border-surface-border overflow-hidden p-6 flex items-center justify-center">
-            <Image
-              src={product.image_url}
-              alt={product.title}
-              fill
-              priority
-              sizes="(max-width: 1024px) 100vw, 40vw"
-              className="object-contain p-4 hover:scale-105 transition-transform duration-300"
-            />
-          </div>
-
-          <div className="flex items-center justify-center gap-2 text-xs text-copy-secondary">
-            <ShieldCheck className="w-4 h-4 text-brand-600" />
-            <span>Genuine retailer product preview</span>
-          </div>
+        <div className="lg:col-span-5">
+          <ProductImageGallery
+            primaryImage={product.image_url}
+            title={product.title}
+            images={product.images}
+          />
         </div>
 
         {/* Right: Product Info & Affiliate Actions (7 cols) */}
@@ -226,11 +217,6 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
           {/* Interactive Actions (Wishlist & Affiliate Purchase Button) */}
           <div className="space-y-3 pt-4 border-t border-surface-border">
             <ProductActions product={product} />
-
-            {/* Affiliate Disclosure Notice */}
-            <div className="text-[11px] text-copy-muted bg-[#F5F8F5] p-3 rounded-xl border border-surface-border/60">
-              <span className="font-semibold text-copy-secondary">Affiliate Disclosure:</span> When you click &quot;Buy on {product.retailer}&quot; and complete a purchase, SimpleXplore may earn an affiliate commission at no extra cost to you. We do not sell items directly.
-            </div>
           </div>
         </div>
       </div>

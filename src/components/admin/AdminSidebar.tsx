@@ -17,7 +17,9 @@ import {
   ShieldCheck,
   CheckCircle2,
   AlertCircle,
-  LogOut
+  LogOut,
+  Globe,
+  ArrowRight
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
@@ -39,24 +41,26 @@ export default function AdminSidebar() {
   };
 
   const navItems = [
-    { label: 'Overview', href: '/admin', icon: LayoutDashboard },
-    { label: 'All Products', href: '/admin/products', icon: Package },
-    { label: 'Add Product', href: '/admin/products/new', icon: PlusCircle },
-    { label: 'Bulk CSV / Excel', href: '/admin/bulk-upload', icon: UploadCloud },
-    { label: 'Categories', href: '/admin/categories', icon: Layers },
+    { label: 'Overview', href: '/admin', exact: true, icon: LayoutDashboard },
+    { label: 'All Products', href: '/admin/products', exact: true, icon: Package },
+    { label: 'Add Product', href: '/admin/products/new', exact: true, icon: PlusCircle },
+    { label: 'Bulk CSV / Excel', href: '/admin/bulk-upload', exact: true, icon: UploadCloud },
+    { label: 'Categories', href: '/admin/categories', exact: true, icon: Layers },
     { 
       label: 'Telegram Sync', 
       href: '/admin/telegram', 
+      exact: true,
       icon: Send,
     },
     { 
       label: 'Pending Review', 
       href: '/admin/telegram/imports', 
+      exact: false,
       icon: Clock,
-      badge: 'Review Drafts'
+      badge: 'Drafts'
     },
-    { label: 'Click Analytics', href: '/admin/analytics', icon: BarChart3 },
-    { label: 'Website Settings', href: '/admin/settings', icon: Settings },
+    { label: 'Click Analytics', href: '/admin/analytics', exact: true, icon: BarChart3 },
+    { label: 'Website Settings', href: '/admin/settings', exact: true, icon: Settings },
   ];
 
   return (
@@ -80,17 +84,43 @@ export default function AdminSidebar() {
           </Link>
         </div>
 
+        {/* Quick Shortcut to Customer Storefront View */}
+        <div>
+          <Link
+            href="/"
+            className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-[#1C291C] hover:bg-[#253925] text-brand-300 hover:text-white border border-[#2B402B] transition-all group"
+            title="Switch to customer storefront view with account persisted"
+          >
+            <div className="flex items-center gap-2.5">
+              <Globe className="w-4 h-4 text-brand-400 group-hover:scale-110 transition-transform" />
+              <span>Customer View</span>
+            </div>
+            <ArrowRight className="w-3.5 h-3.5 opacity-60 group-hover:translate-x-0.5 transition-transform" />
+          </Link>
+        </div>
+
         {/* Navigation Links */}
         <nav className="space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href));
+            
+            // Precise active logic to avoid multiple concurrent highlights
+            let isActive = false;
+            if (item.exact) {
+              isActive = pathname === item.href;
+              // If viewing /admin/products/[id]/edit, keep "All Products" highlighted
+              if (item.href === '/admin/products' && pathname.startsWith('/admin/products/') && pathname !== '/admin/products/new') {
+                isActive = true;
+              }
+            } else {
+              isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+            }
 
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold outline-none focus:outline-none transition-all ${
                   isActive
                     ? 'bg-brand-600 text-white shadow-soft-sm'
                     : 'text-[#B0C0B0] hover:bg-[#202C20] hover:text-white'
@@ -102,7 +132,7 @@ export default function AdminSidebar() {
                 </div>
                 {item.badge && (
                   <span className="bg-amber-500/20 text-amber-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-500/30">
-                    Drafts
+                    {item.badge}
                   </span>
                 )}
               </Link>
@@ -115,11 +145,14 @@ export default function AdminSidebar() {
       <div className="p-4 border-t border-[#243324] space-y-2">
         <Link
           href="/"
-          target="_blank"
           className="flex items-center justify-between px-3 py-2 text-xs text-[#A8B8A8] hover:text-white hover:bg-[#202C20] rounded-xl transition-colors"
+          title="Return to customer landing page with account persisted"
         >
-          <span>View Public Storefront</span>
-          <ExternalLink className="w-3.5 h-3.5" />
+          <div className="flex items-center gap-2">
+            <Globe className="w-3.5 h-3.5 text-brand-400" />
+            <span>Customer Landing Page</span>
+          </div>
+          <ArrowRight className="w-3.5 h-3.5 opacity-60" />
         </Link>
 
         <button
