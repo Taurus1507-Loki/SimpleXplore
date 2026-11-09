@@ -111,7 +111,7 @@ async function extractListing(
   let title = metadata.title;
   if (!title) {
     const firstLine = messageText.split('\n')[0].replace(URL_REGEX, '').replace(/[🔥⚡💥deal!]/gi, '').trim();
-    title = firstLine.length > 5 ? firstLine : `${retailer} Special Product Deal`;
+    title = firstLine.length > 5 ? firstLine : `${retailer} product`; // placeholder, flagged below
   }
 
   // Check for existing duplicates via normalized URL or Retailer Product ID (ASIN, etc.)
@@ -130,11 +130,18 @@ async function extractListing(
     original_price: originalPrice,
     discount,
     retailer: metadata.retailer || retailer,
-    image_url: metadata.image_url || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800',
-    category: metadata.category || 'Electronics',
+    image_url: metadata.image_url || undefined, // never substitute a stock photo
+    category: metadata.category || undefined,
     rating: metadata.rating,
     review_count: metadata.review_count,
-    highlights: metadata.highlights && metadata.highlights.length > 0 ? metadata.highlights : ['Discovered via Telegram Channel: ' + channelName],
+    highlights: metadata.highlights && metadata.highlights.length > 0 ? metadata.highlights : [],
+    // Anything we could not verify is left blank and listed here for the admin to fill in.
+    missing_fields: [
+      ...(metadata.title ? [] : ['title']),
+      ...(metadata.image_url ? [] : ['image']),
+      ...(currentPrice > 0 ? [] : ['price']),
+      ...(metadata.category ? [] : ['category']),
+    ],
     raw_message: messageText,
     is_duplicate: !!duplicateProduct,
     duplicate_of_id: duplicateProduct?.id,
@@ -169,7 +176,7 @@ async function createDraftProduct(listing: ExtractedListing, rawUrl: string): Pr
     discount,
     rating: extractedPayload.rating ?? null, // never invent ratings
     review_count: extractedPayload.review_count ?? null,
-    image_url: extractedPayload.image_url,
+    image_url: extractedPayload.image_url ?? '', // blank until the admin adds a real image
     affiliate_url: rawUrl, // Preserve original affiliate link posted in Telegram
     featured: false,
     trending: false,
@@ -269,6 +276,22 @@ export async function processTelegramPost(
           review_status: 'pending',
         });
 
+        results.push(importRecord);
+        continue;
+      }
+
+      // Edit of a post whose product is already LIVE: never change public details silently.
+      // Record the new details as a pending update; Approve & Publish applies them, Reject discards them.
+      if (isEdited && duplicateProduct && duplicateProduct.status === 'published') {
+        const importRecord = await db.createTelegramImport({
+          telegram_update_id: `upd-${updateId}`,
+          product_id: duplicateProduct.id,
+          original_url: rawUrl,
+          affiliate_url: resolvedUrl,
+          extracted_data: { ...extractedPayload, pending_update: true },
+          extraction_status: listing.extractionStatus,
+          review_status: 'pending',
+        });
         results.push(importRecord);
         continue;
       }

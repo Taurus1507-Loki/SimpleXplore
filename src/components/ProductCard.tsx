@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, Heart, ExternalLink, TrendingUp } from 'lucide-react';
+import { Star, Heart, ExternalLink, TrendingUp, ImageOff } from 'lucide-react';
 import { Product } from '@/types';
 import { formatPrice } from '@/lib/utils/formatters';
 import { useWishlist } from './WishlistContext';
@@ -14,7 +14,6 @@ interface ProductCardProps {
   priority?: boolean;
 }
 
-const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800';
 
 export default function ProductCard({ product, priority = false }: ProductCardProps) {
   const { isInWishlist, toggleWishlist } = useWishlist();
@@ -32,14 +31,21 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
     >
       {/* Image */}
       <Link href={href} className="relative block aspect-square overflow-hidden bg-surface-muted/60" tabIndex={-1} aria-hidden="true">
-        <Image
-          src={product.image_url || FALLBACK_IMAGE}
-          alt=""
-          fill
-          priority={priority}
-          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-          className="object-contain p-3 mix-blend-multiply transition-transform duration-500 ease-out-expo group-hover:scale-[1.03] sm:p-5"
-        />
+        {product.image_url ? (
+          <Image
+            src={product.image_url}
+            alt=""
+            fill
+            priority={priority}
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            className="object-contain p-3 mix-blend-multiply transition-transform duration-500 ease-out-expo group-hover:scale-[1.03] sm:p-5"
+          />
+        ) : (
+          <span className="flex h-full w-full flex-col items-center justify-center gap-1 text-copy-muted">
+            <ImageOff className="h-6 w-6" aria-hidden="true" />
+            <span className="text-[11px]">No image</span>
+          </span>
+        )}
       </Link>
 
       {/* Badges */}

@@ -247,13 +247,17 @@ export default function ImportsClient({ initialImports, statusFilter }: ImportsC
 
                   {/* Thumbnail */}
                   <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-[#F8FAF8] border border-surface-border overflow-hidden flex-shrink-0 p-2">
-                    <Image
-                      src={item.extracted_data.image_url || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=200'}
-                      alt={item.extracted_data.title || 'Product'}
-                      fill
-                      sizes="96px"
-                      className="object-contain"
-                    />
+                    {item.extracted_data.image_url ? (
+                      <Image
+                        src={item.extracted_data.image_url}
+                        alt={item.extracted_data.title || 'Product'}
+                        fill
+                        sizes="96px"
+                        className="object-contain"
+                      />
+                    ) : (
+                      <span className="flex h-full w-full items-center justify-center text-center text-[10px] text-copy-muted">No image</span>
+                    )}
                   </div>
 
                   <div className="space-y-1.5 flex-1 min-w-0">
@@ -267,6 +271,18 @@ export default function ImportsClient({ initialImports, statusFilter }: ImportsC
                           {item.extracted_data.discount}% OFF
                         </span>
                       ) : null}
+
+                      {item.extracted_data.pending_update && (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200">
+                          Update to a live product
+                        </span>
+                      )}
+
+                      {!isFailed && (item.extracted_data.missing_fields?.length ?? 0) > 0 && (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                          Needs: {item.extracted_data.missing_fields!.join(', ')}
+                        </span>
+                      )}
 
                       {isDuplicate && (
                         <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">

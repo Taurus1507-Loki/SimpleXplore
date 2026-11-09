@@ -25,7 +25,10 @@ export interface FakeSupabase {
   tables: Record<string, Row[]>;
   /** Make every query against `table` fail with this message. */
   failTables: Set<string>;
-  client: { from: (table: string) => Query };
+  client: {
+    from: (table: string) => Query;
+    rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>;
+  };
 }
 
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v));
@@ -151,7 +154,22 @@ export function createFakeSupabase(seed: Record<string, Row[]> = {}): FakeSupaba
   const fake: FakeSupabase = {
     tables: Object.fromEntries(Object.entries(seed).map(([k, rows]) => [k, clone(rows)])),
     failTables: new Set(),
-    client: { from: (table: string) => new Query(fake, table) },
+    client: {
+      from: (table: string) => new Query(fake, table),
+      // Mirrors public.lease_telegram_updates() from migration 004.
+      rpc: async (fn: string, args: Record<string, unknown> = {}) => {
+        if (fn !== 'lease_telegram_updates') return { data: null, error: { message: 'unknown function ' + fn } };
+        const batch = Number(args.batch_size ?? 5);
+        const maxAttempts = Number(args.max_attempts ?? 3);
+        const staleBefore = Date.now() - 5 * 60 * 1000;
+        const rows = (fake.tables.telegram_updates ?? [])
+          .filter(r => r.processing_status === 'pending' && r.payload != null && Number(r.attempts ?? 0) < maxAttempts &&
+            (!r.locked_at || new Date(r.locked_at as string).getTime() < staleBefore))
+          .slice(0, batch);
+        for (const r of rows) { r.locked_at = new Date().toISOString(); r.attempts = Number(r.attempts ?? 0) + 1; }
+        return { data: clone(rows), error: null };
+      },
+    },
   };
   return fake;
 }

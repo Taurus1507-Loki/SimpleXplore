@@ -15,7 +15,14 @@ vi.mock('@/lib/telegram/service', async importOriginal => {
   return { ...actual, processTelegramPost: vi.fn(async () => []) };
 });
 
+// Background work is triggered explicitly in tests (no detached promises).
+vi.mock('@/lib/telegram/queue', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/telegram/queue')>();
+  return { ...actual, runAfterResponse: vi.fn() };
+});
+
 import { db, initialSettings, aggregateClicks, trafficSourceOf } from '@/lib/db';
+import { processTelegramQueue, runAfterResponse } from '@/lib/telegram/queue';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { processTelegramPost } from '@/lib/telegram/service';
 import { POST as webhookPOST } from '@/app/api/telegram/webhook/route';
@@ -79,6 +86,7 @@ beforeEach(() => {
   state.fake = fake;
   vi.mocked(createAdminClient).mockClear();
   vi.mocked(processTelegramPost).mockClear();
+  vi.mocked(runAfterResponse).mockClear();
 });
 
 afterEach(() => {
@@ -249,35 +257,67 @@ describe('Supabase mode: Telegram webhook idempotency', () => {
     channel_post: { message_id: 55, chat: { id: -100123, title: 'Deals' }, date: 1, text: 'Deal ₹999 https://amzn.to/abc' },
   };
 
-  it('records the update in telegram_updates and processes it exactly once', async () => {
+  it('replies immediately, queues the post, then processes it exactly once', async () => {
     const first = await (await send(update)).json();
     const second = await (await send(update)).json();
 
-    expect(first.status).toBe('processed_channel_post');
-    expect(second.message).toBe('Update already processed');
-    expect(processTelegramPost).toHaveBeenCalledTimes(1);
+    expect(first.status).toBe('queued_channel_post');
+    expect(second.message).toBe('Update already received');
+    // Nothing is extracted before the reply; background work is scheduled once.
+    expect(processTelegramPost).not.toHaveBeenCalled();
+    expect(runAfterResponse).toHaveBeenCalledTimes(1);
     expect(fake.tables.telegram_updates).toHaveLength(1);
     expect(fake.tables.telegram_updates[0]).toMatchObject({
       update_id: 777001,
       channel_id: '-100123',
       message_id: 55,
       original_urls: ['https://amzn.to/abc'],
-      processing_status: 'processed',
+      processing_status: 'pending',
+      is_edited: false,
+      payload: update.channel_post,
     });
+
+    const run = await processTelegramQueue();
+    expect(run).toMatchObject({ processed: 1, failed: 0, remaining: false });
+    expect(processTelegramPost).toHaveBeenCalledTimes(1);
+    expect(processTelegramPost).toHaveBeenCalledWith(update.channel_post, 777001, false);
+    expect(fake.tables.telegram_updates[0].processing_status).toBe('processed');
+
+    await processTelegramQueue(); // nothing left
+    expect(processTelegramPost).toHaveBeenCalledTimes(1);
+  });
+
+  it('queues edited posts with the edited flag', async () => {
+    await send({ update_id: 777010, edited_channel_post: update.channel_post });
+    expect(fake.tables.telegram_updates[0]).toMatchObject({ is_edited: true, processing_status: 'pending' });
+    await processTelegramQueue();
+    expect(processTelegramPost).toHaveBeenCalledWith(update.channel_post, 777010, true);
   });
 
   it('survives a "restart": a row already in telegram_updates blocks reprocessing', async () => {
     fake.tables.telegram_updates = [{ id: randomUUID(), update_id: 777001, channel_id: '-100123', message_id: 55, processing_status: 'processed' }];
     const res = await (await send(update)).json();
-    expect(res.message).toBe('Update already processed');
+    expect(res.message).toBe('Update already received');
+    await processTelegramQueue();
     expect(processTelegramPost).not.toHaveBeenCalled();
   });
 
-  it('marks the update failed when processing throws', async () => {
-    vi.mocked(processTelegramPost).mockRejectedValueOnce(new Error('boom'));
-    const res = await (await send({ ...update, update_id: 777002 })).json();
-    expect(res.ok).toBe(false);
-    expect(fake.tables.telegram_updates[0].processing_status).toBe('failed');
+  it('retries a failing update and marks it failed after the last attempt', async () => {
+    vi.mocked(processTelegramPost).mockRejectedValue(new Error('boom'));
+    await send({ ...update, update_id: 777002 });
+
+    await processTelegramQueue();
+    expect(fake.tables.telegram_updates[0]).toMatchObject({ processing_status: 'pending', attempts: 1, last_error: 'boom' });
+
+    // Release the lease as if 5+ minutes passed, then exhaust the remaining attempts.
+    for (let i = 0; i < 2; i++) {
+      fake.tables.telegram_updates[0].locked_at = null;
+      await processTelegramQueue();
+    }
+    expect(fake.tables.telegram_updates[0]).toMatchObject({ processing_status: 'failed', attempts: 3 });
+    expect(processTelegramPost).toHaveBeenCalledTimes(3);
+    vi.mocked(processTelegramPost).mockReset();
+    vi.mocked(processTelegramPost).mockResolvedValue([]);
   });
 
   it('does not record unsupported update types', async () => {

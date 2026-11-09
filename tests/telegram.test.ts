@@ -73,9 +73,16 @@ describe('Telegram Integration & SSRF Protection', () => {
     let product = await db.getProductById(importItem.product_id!);
     expect(product?.status).toBe('draft');
 
-    // Admin clicks Approve & Publish
+    // Publishing is blocked while required details are blank (nothing is invented).
+    const blocked = await db.approveAndPublishTelegramImport(importItem.id, { title: 'Approved Realme Earbuds', image_url: '' });
+    expect(blocked.success).toBe(false);
+    expect((await db.getProductById(importItem.product_id!))?.status).toBe('draft');
+
+    // Admin fills in the image and clicks Approve & Publish
     const result = await db.approveAndPublishTelegramImport(importItem.id, {
       title: 'Approved Realme Earbuds',
+      image_url: 'https://rukminim2.flixcart.com/image/earbuds.jpg',
+      current_price: 1999,
     });
 
     expect(result.success).toBe(true);

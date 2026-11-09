@@ -309,6 +309,17 @@ function mapImportRow(row: Row): TelegramImport {
   };
 }
 
+export const TELEGRAM_MAX_ATTEMPTS = 3;
+
+export interface QueuedTelegramUpdate {
+  update_id: number;
+  payload: unknown;
+  is_edited: boolean;
+  attempts: number;
+  locked_at: string | null;
+  status: 'pending' | 'processed' | 'failed';
+}
+
 export interface CategoryInput {
   name: string;
   slug: string;
@@ -435,6 +446,7 @@ class DataRepository {
   private settings: WebsiteSettings = { ...initialSettings };
   private wishlists: Record<string, string[]> = {}; // userId -> productIds[]
   private processedTelegramUpdates = new Set<number>(); // demo-mode webhook idempotency
+  private telegramQueue: QueuedTelegramUpdate[] = []; // demo-mode processing queue
 
   constructor() {
     // Add pending draft products from initial Telegram imports to the products table with status 'draft'
@@ -752,7 +764,7 @@ class DataRepository {
       discount: data.discount || 0,
       rating: data.rating ?? null,
       review_count: data.review_count ?? null,
-      image_url: data.image_url || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800',
+      image_url: data.image_url || '',
       affiliate_url: data.affiliate_url || '#',
       featured: data.featured || false,
       trending: data.trending || false,
@@ -839,6 +851,9 @@ class DataRepository {
     message_id: number;
     message_text?: string | null;
     original_urls?: string[];
+    /** The channel post, stored so extraction can run after the webhook has replied. */
+    payload?: unknown;
+    is_edited?: boolean;
   }): Promise<{ claimed: boolean; id?: string }> {
     const sb = this.supabase();
     if (sb) {
@@ -851,6 +866,8 @@ class DataRepository {
           message_text: update.message_text ?? null,
           original_urls: update.original_urls ?? [],
           processing_status: 'pending',
+          payload: update.payload ?? null,
+          is_edited: update.is_edited ?? false,
         })
         .select('id')
         .single();
@@ -863,11 +880,95 @@ class DataRepository {
 
     if (this.processedTelegramUpdates.has(update.update_id)) return { claimed: false };
     this.processedTelegramUpdates.add(update.update_id);
+    if (update.payload) {
+      this.telegramQueue.push({
+        update_id: update.update_id,
+        payload: update.payload,
+        is_edited: update.is_edited ?? false,
+        attempts: 0,
+        locked_at: null,
+        status: 'pending',
+      });
+    }
     if (this.processedTelegramUpdates.size > 10000) {
       // Keep memory bounded
       Array.from(this.processedTelegramUpdates).slice(0, 5000).forEach(id => this.processedTelegramUpdates.delete(id));
     }
     return { claimed: true };
+  }
+
+  /** Atomically take up to `limit` pending updates for processing (see migration 004). */
+  async leaseTelegramUpdates(limit = 5): Promise<QueuedTelegramUpdate[]> {
+    const sb = this.supabase();
+    if (sb) {
+      const { data, error } = await sb.rpc('lease_telegram_updates', {
+        batch_size: limit,
+        max_attempts: TELEGRAM_MAX_ATTEMPTS,
+      });
+      if (error) throw new Error(`Failed to lease Telegram updates: ${error.message}. Has migration 004 been run?`);
+      return ((data as Row[]) ?? []).map((r) => ({
+        update_id: Number(r.update_id),
+        payload: r.payload,
+        is_edited: Boolean(r.is_edited),
+        attempts: Number(r.attempts ?? 1),
+        locked_at: r.locked_at ?? null,
+        status: 'pending' as const,
+      }));
+    }
+
+    const staleBefore = Date.now() - 5 * 60 * 1000;
+    const leased: QueuedTelegramUpdate[] = [];
+    for (const item of this.telegramQueue) {
+      if (leased.length >= limit) break;
+      if (item.status !== 'pending' || item.attempts >= TELEGRAM_MAX_ATTEMPTS) continue;
+      if (item.locked_at && new Date(item.locked_at).getTime() > staleBefore) continue;
+      item.locked_at = new Date().toISOString();
+      item.attempts += 1;
+      leased.push({ ...item });
+    }
+    return leased;
+  }
+
+  /** Mark a leased update done, or put it back for another attempt (failed after the last attempt). */
+  async completeTelegramUpdate(updateId: number, outcome: { ok: true } | { ok: false; error: string; attempts: number }): Promise<void> {
+    const finalFailure = !outcome.ok && outcome.attempts >= TELEGRAM_MAX_ATTEMPTS;
+    const status = outcome.ok ? 'processed' : finalFailure ? 'failed' : 'pending';
+    const sb = this.supabase();
+    if (sb) {
+      const { error } = await sb
+        .from('telegram_updates')
+        .update({
+          processing_status: status,
+          // A retryable failure keeps its lease, so the next attempt waits for the 5-minute stale window (backoff).
+          locked_at: outcome.ok || finalFailure ? null : new Date().toISOString(),
+          last_error: outcome.ok ? null : outcome.error.slice(0, 1000),
+          processed_at: outcome.ok || finalFailure ? new Date().toISOString() : null,
+        })
+        .eq('update_id', updateId);
+      if (error) console.error('Failed to complete Telegram update:', error.message);
+      return;
+    }
+    const item = this.telegramQueue.find((q) => q.update_id === updateId);
+    if (!item) return;
+    item.status = status;
+    item.locked_at = outcome.ok || finalFailure ? null : new Date().toISOString();
+    if (outcome.ok) this.telegramQueue = this.telegramQueue.filter((q) => q.update_id !== updateId);
+  }
+
+  /** Counts for the admin dashboard. */
+  async getTelegramQueueStats(): Promise<{ pending: number; failed: number }> {
+    const sb = this.supabase();
+    if (sb) {
+      const [pending, failed] = await Promise.all([
+        sb.from('telegram_updates').select('id', { count: 'exact', head: true }).eq('processing_status', 'pending'),
+        sb.from('telegram_updates').select('id', { count: 'exact', head: true }).eq('processing_status', 'failed'),
+      ]);
+      return { pending: pending.count ?? 0, failed: failed.count ?? 0 };
+    }
+    return {
+      pending: this.telegramQueue.filter((q) => q.status === 'pending').length,
+      failed: this.telegramQueue.filter((q) => q.status === 'failed').length,
+    };
   }
 
   async setTelegramUpdateStatus(updateId: number, status: 'processed' | 'failed' | 'ignored'): Promise<void> {
@@ -1010,6 +1111,9 @@ class DataRepository {
     if (fetchError) return { success: false, error: fetchError.message };
     if (!item) return { success: false, error: 'Telegram import record not found' };
 
+    const blocker = await this.publishBlocker(mapImportRow(item), editedData);
+    if (blocker) return { success: false, error: blocker };
+
     const extracted: TelegramImport['extracted_data'] = item.extracted_data ?? {};
     let product: Product | null;
 
@@ -1065,6 +1169,24 @@ class DataRepository {
     return { success: true, product };
   }
 
+  /**
+   * Nothing is published with blanks we would otherwise have to invent.
+   * Final value = admin's edit, else the existing draft, else what extraction found.
+   */
+  private async publishBlocker(item: TelegramImport, editedData?: Partial<Product>): Promise<string | null> {
+    const draft = item.product_id ? await this.getProductById(item.product_id) : null;
+    const x = item.extracted_data ?? {};
+    const title = editedData?.title ?? draft?.title ?? x.title;
+    const price = editedData?.current_price ?? draft?.current_price ?? x.price;
+    const image = editedData?.image_url ?? draft?.image_url ?? x.image_url;
+    const retailer = editedData?.retailer ?? draft?.retailer ?? x.retailer;
+    if (!title || !String(title).trim()) return 'A product title is required before publishing';
+    if (!(Number(price) > 0)) return 'A product price is required before publishing';
+    if (!image || !String(image).trim()) return 'A product image is required before publishing';
+    if (!retailer || !String(retailer).trim()) return 'A retailer is required before publishing';
+    return null;
+  }
+
   async approveAndPublishTelegramImport(importId: string, editedData?: Partial<Product>): Promise<{ success: boolean; product?: Product; error?: string }> {
     const sb = this.supabase();
     if (sb) {
@@ -1081,6 +1203,8 @@ class DataRepository {
     }
 
     const item = this.telegramImports[itemIndex];
+    const blocker = await this.publishBlocker(item, editedData);
+    if (blocker) return { success: false, error: blocker };
     let product = this.products.find(p => p.id === item.product_id);
 
     if (!product) {
@@ -1095,9 +1219,9 @@ class DataRepository {
         original_price: editedData?.original_price ?? item.extracted_data.original_price,
         discount: editedData?.discount ?? item.extracted_data.discount,
         currency: 'INR',
-        image_url: editedData?.image_url || item.extracted_data.image_url || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800',
+        image_url: editedData?.image_url || item.extracted_data.image_url || '',
         affiliate_url: editedData?.affiliate_url || item.affiliate_url,
-        category_id: editedData?.category_id || 'cat-electronics',
+        category_id: editedData?.category_id || null,
         status: 'published', // Admin explicitly clicked Approve & Publish
         source_type: 'telegram',
       });

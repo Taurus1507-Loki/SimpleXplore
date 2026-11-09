@@ -28,19 +28,21 @@ export default function ReviewClient({ initialImport, categories }: ReviewClient
   const router = useRouter();
   const [importItem, setImportItem] = useState(initialImport);
   const ext = importItem.extracted_data;
+  // For an update to a live product, blanks fall back to the live values (never wiped by a partial edit).
+  const live = ext.pending_update ? importItem.product : undefined;
 
   // Form states initialized with extracted data
-  const [title, setTitle] = useState(ext.title || '');
-  const [price, setPrice] = useState<number>(ext.price || 0);
-  const [originalPrice, setOriginalPrice] = useState<number | undefined>(ext.original_price);
-  const [discount, setDiscount] = useState<number | undefined>(ext.discount);
-  const [retailer, setRetailer] = useState(ext.retailer || 'Amazon India');
-  const [imageUrl, setImageUrl] = useState(ext.image_url || '');
-  const [categoryId, setCategoryId] = useState(categories[0]?.id || 'cat-electronics');
-  const [description, setDescription] = useState(ext.description || '');
+  const [title, setTitle] = useState(ext.title || live?.title || '');
+  const [price, setPrice] = useState<number>(ext.price || live?.current_price || 0);
+  const [originalPrice, setOriginalPrice] = useState<number | undefined>(ext.original_price ?? live?.original_price ?? undefined);
+  const [discount, setDiscount] = useState<number | undefined>(ext.discount ?? live?.discount ?? undefined);
+  const [retailer, setRetailer] = useState(ext.retailer || live?.retailer || '');
+  const [imageUrl, setImageUrl] = useState(ext.image_url || live?.image_url || '');
+  const [categoryId, setCategoryId] = useState(live?.category_id || categories[0]?.id || '');
+  const [description, setDescription] = useState(ext.description || live?.description || '');
   const [affiliateUrl, setAffiliateUrl] = useState(importItem.affiliate_url || importItem.original_url);
-  const [isFeatured, setIsFeatured] = useState(false);
-  const [isTrending, setIsTrending] = useState(false);
+  const [isFeatured, setIsFeatured] = useState(live?.featured ?? false);
+  const [isTrending, setIsTrending] = useState(live?.trending ?? false);
 
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -208,6 +210,23 @@ export default function ReviewClient({ initialImport, categories }: ReviewClient
             </Link>
           </div>
           <p className="text-[11px] text-red-800/80">You can also fill in the form below and use Approve &amp; Publish.</p>
+        </div>
+      )}
+
+      {importItem.extracted_data.pending_update && (
+        <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-xs text-sky-900">
+          <p className="font-semibold">This is an edit to a product that is already live.</p>
+          <p className="mt-1">
+            The live product has <strong>not</strong> been changed. The form below shows the new details from the edited
+            Telegram post — Approve &amp; Publish applies them; Reject keeps the live product as it is.
+          </p>
+        </div>
+      )}
+
+      {!isFailed && (importItem.extracted_data.missing_fields?.length ?? 0) > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
+          <p className="font-semibold">Fill in before publishing: {importItem.extracted_data.missing_fields!.join(', ')}</p>
+          <p className="mt-1">We couldn&apos;t verify these from the retailer page, so they were left blank instead of guessed.</p>
         </div>
       )}
 
@@ -424,7 +443,7 @@ export default function ReviewClient({ initialImport, categories }: ReviewClient
             <div className="max-w-sm mx-auto bg-white rounded-2xl border border-surface-border shadow-soft-md overflow-hidden p-4 space-y-3">
               <div className="relative aspect-square w-full rounded-xl bg-[#F8FAF8] border border-surface-border overflow-hidden p-4 flex items-center justify-center">
                 <Image
-                  src={imageUrl || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800'}
+                  src={imageUrl || '/icon.svg'}
                   alt={title || 'Product preview'}
                   fill
                   sizes="300px"

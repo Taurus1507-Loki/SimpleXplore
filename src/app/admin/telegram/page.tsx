@@ -20,6 +20,8 @@ export default function AdminTelegramSettingsPage() {
   const [simulationResult, setSimulationResult] = useState<string | null>(null);
   const [simulating, setSimulating] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [processingQueue, setProcessingQueue] = useState(false);
+  const [queueResult, setQueueResult] = useState<string | null>(null);
 
   const webhookUrl = typeof window !== 'undefined' 
     ? `${window.location.origin}/api/telegram/webhook` 
@@ -160,6 +162,42 @@ export default function AdminTelegramSettingsPage() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Background processing queue */}
+      <div className="bg-white p-6 rounded-3xl border border-surface-border shadow-soft-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <h2 className="text-base font-bold font-display text-copy-primary">Background processing</h2>
+          <p className="text-xs text-copy-secondary max-w-xl">
+            New posts are queued and read in the background, so Telegram gets an instant reply. Drafts usually appear
+            within seconds. If some seem stuck, process the queue now.
+          </p>
+          {queueResult && <p role="status" className="text-xs font-medium text-brand-800">{queueResult}</p>}
+        </div>
+        <button
+          type="button"
+          disabled={processingQueue}
+          onClick={async () => {
+            setProcessingQueue(true);
+            setQueueResult(null);
+            try {
+              const res = await fetch('/api/telegram/process', { method: 'POST' });
+              const data = await res.json();
+              setQueueResult(
+                data.ok
+                  ? `Processed ${data.processed} post(s)${data.failed ? `, ${data.failed} failed` : ''}. Waiting: ${data.queue.pending}, failed for good: ${data.queue.failed}.`
+                  : data.error || 'Could not process the queue.'
+              );
+            } catch {
+              setQueueResult('Network error.');
+            } finally {
+              setProcessingQueue(false);
+            }
+          }}
+          className="inline-flex min-h-[40px] shrink-0 items-center justify-center rounded-xl bg-brand-600 px-4 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
+        >
+          {processingQueue ? 'Processing…' : 'Process queue now'}
+        </button>
       </div>
 
       {/* Live Telegram Import Simulator */}

@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
         discount,
         rating: parseFloat(String(row['Rating'] || '4.2')),
         review_count: parseInt(String(row['Review Count'] || '10'), 10),
-        image_url: String(row['Image URL'] || row['image_url'] || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800').trim(),
+        image_url: String(row['Image URL'] || row['image_url'] || '').trim(),
         affiliate_url: affiliateUrl,
         featured: String(row['Featured']).toLowerCase() === 'true',
         trending: String(row['Trending']).toLowerCase() === 'true',

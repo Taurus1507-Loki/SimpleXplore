@@ -121,6 +121,10 @@ export interface TelegramImport {
     highlights?: string[];
     raw_message?: string;
     is_duplicate?: boolean;
+    /** Fields extraction could not verify; left blank for the admin to complete. */
+    missing_fields?: string[];
+    /** Set when an edited Telegram post targets an already-published product. */
+    pending_update?: boolean;
     duplicate_of_id?: string;
     duplicate_of_title?: string;
     duplicate_of_status?: string;
