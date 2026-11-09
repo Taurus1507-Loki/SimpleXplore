@@ -16,12 +16,21 @@ export async function POST(req: NextRequest) {
 
     const slug = data.slug ? slugify(data.slug) : slugify(data.title) + '-' + Math.random().toString(36).substr(2, 4);
 
+    const { source_import_id: sourceImportId, ...productData } = data;
     const product = await db.createProduct({
-      ...data,
+      ...productData,
       slug,
-      source_type: data.source_type || 'manual',
-      status: data.status || 'draft',
+      source_type: sourceImportId ? 'telegram' : productData.source_type || 'manual',
+      status: productData.status || 'draft',
     });
+
+    // Manual creation from a failed Telegram import: link the import to the new product.
+    if (typeof sourceImportId === 'string' && sourceImportId) {
+      await db.updateTelegramImport(sourceImportId, {
+        product_id: product.id,
+        error_message: 'Product created manually by admin',
+      });
+    }
 
     return NextResponse.json({ success: true, product });
   } catch (error: unknown) {

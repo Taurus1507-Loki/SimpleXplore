@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
+import ImageUploadField from '@/components/admin/ImageUploadField';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { TelegramImport, Category, Product } from '@/types';
@@ -34,7 +35,7 @@ export default function ReviewClient({ initialImport, categories }: ReviewClient
   const [originalPrice, setOriginalPrice] = useState<number | undefined>(ext.original_price);
   const [discount, setDiscount] = useState<number | undefined>(ext.discount);
   const [retailer, setRetailer] = useState(ext.retailer || 'Amazon India');
-  const [imageUrl, setImageUrl] = useState(ext.image_url || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800');
+  const [imageUrl, setImageUrl] = useState(ext.image_url || '');
   const [categoryId, setCategoryId] = useState(categories[0]?.id || 'cat-electronics');
   const [description, setDescription] = useState(ext.description || '');
   const [affiliateUrl, setAffiliateUrl] = useState(importItem.affiliate_url || importItem.original_url);
@@ -130,6 +131,33 @@ export default function ReviewClient({ initialImport, categories }: ReviewClient
   };
 
   const isApproved = importItem.review_status === 'approved';
+  const isFailed = importItem.extraction_status === 'failed' && !importItem.product_id;
+  const [retrying, setRetrying] = useState(false);
+
+  /** Re-run extraction; on success reload so the form shows the newly extracted draft. */
+  const handleRetry = async () => {
+    setRetrying(true);
+    setFeedback(null);
+    try {
+      const res = await fetch('/api/admin/telegram/retry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ importId: importItem.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.import) setImportItem((prev) => ({ ...prev, ...data.import }));
+      if (res.ok && data.success) {
+        setFeedback({ type: 'success', message: 'Retry worked — reloading with the extracted details…' });
+        setTimeout(() => window.location.reload(), 900);
+      } else {
+        setFeedback({ type: 'error', message: `Retry failed: ${data.error || 'unknown error'}` });
+      }
+    } catch {
+      setFeedback({ type: 'error', message: 'Network error while retrying.' });
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   return (
     <div className="space-y-8 max-w-7xl">
@@ -153,6 +181,35 @@ export default function ReviewClient({ initialImport, categories }: ReviewClient
           </span>
         </div>
       </div>
+
+      {isFailed && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 sm:p-5 space-y-3">
+          <div className="flex items-start gap-2 text-sm text-red-900">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" aria-hidden="true" />
+            <div>
+              <p className="font-semibold">We couldn&apos;t read this product automatically.</p>
+              {importItem.error_message && <p className="mt-1 text-xs text-red-800">{importItem.error_message}</p>}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleRetry}
+              disabled={retrying}
+              className="inline-flex min-h-[40px] items-center gap-2 rounded-xl bg-brand-600 px-4 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
+            >
+              {retrying ? 'Retrying…' : 'Retry extraction'}
+            </button>
+            <Link
+              href={`/admin/products/new?fromImport=${encodeURIComponent(importItem.id)}`}
+              className="inline-flex min-h-[40px] items-center rounded-xl border border-red-200 bg-white px-4 text-xs font-semibold text-copy-primary hover:border-brand-300"
+            >
+              Create product manually
+            </Link>
+          </div>
+          <p className="text-[11px] text-red-800/80">You can also fill in the form below and use Approve &amp; Publish.</p>
+        </div>
+      )}
 
       {feedback && (
         <div className={`p-4 rounded-2xl text-xs font-semibold flex items-center gap-2 ${
@@ -277,15 +334,8 @@ export default function ReviewClient({ initialImport, categories }: ReviewClient
                 </div>
               </div>
 
-              <div>
-                <label className="block font-semibold text-copy-primary mb-1">Image URL</label>
-                <input
-                  type="url"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-surface-border focus:outline-none focus:border-brand-500 font-mono text-xs"
-                />
-              </div>
+              <ImageUploadField label="Product image" value={imageUrl} onChange={setImageUrl} required />
+
 
               <div>
                 <label className="block font-semibold text-copy-primary mb-1">Affiliate Destination URL</label>

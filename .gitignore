@@ -8,3 +8,6 @@ dist/
 # Local tooling / build cache
 .claude/
 *.tsbuildinfo
+
+# Demo-mode image uploads
+public/uploads/

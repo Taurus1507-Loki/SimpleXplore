@@ -83,7 +83,9 @@ When connecting your live Supabase project, run the migrations in order:
 ```bash
 supabase/migrations/001_initial_schema.sql
 supabase/migrations/002_harden_admin_roles.sql
+supabase/migrations/003_storage_product_images.sql
 ```
+Migration 003 creates the public `product-images` storage bucket used by admin image uploads (in demo mode uploads are saved to `public/uploads/` instead, which does not work on serverless hosts).
 This initializes all tables, indexes, triggers, seed categories, and Row Level Security (RLS) policies. Migration 002 stops customers from changing their own role and makes every new sign-up a customer.
 
 ### Admin account

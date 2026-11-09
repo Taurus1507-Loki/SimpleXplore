@@ -10,31 +10,36 @@ import { Save, Globe, Eye, CheckCircle2, AlertCircle, UploadCloud, Plus, Trash2,
 interface ProductFormProps {
   initialProduct?: Product;
   categories: Category[];
+  /** Pre-fill a NEW product (e.g. from a failed Telegram import). */
+  prefill?: Partial<Product>;
+  /** When set, the created product is linked back to this Telegram import. */
+  sourceImportId?: string;
 }
 
-export default function ProductForm({ initialProduct, categories }: ProductFormProps) {
+export default function ProductForm({ initialProduct, categories, prefill, sourceImportId }: ProductFormProps) {
   const router = useRouter();
+  const seed: Partial<Product> | undefined = initialProduct ?? prefill;
 
-  const [title, setTitle] = useState(initialProduct?.title || '');
+  const [title, setTitle] = useState(seed?.title || '');
   const [slug, setSlug] = useState(initialProduct?.slug || '');
-  const [currentPrice, setCurrentPrice] = useState<number>(initialProduct?.current_price || 0);
-  const [originalPrice, setOriginalPrice] = useState<number | undefined>(initialProduct?.original_price || undefined);
-  const [currency, setCurrency] = useState(initialProduct?.currency || 'INR');
-  const [discount, setDiscount] = useState<number | undefined>(initialProduct?.discount || undefined);
-  const [retailer, setRetailer] = useState(initialProduct?.retailer || 'Amazon India');
-  const [categoryId, setCategoryId] = useState(initialProduct?.category_id || categories[0]?.id || 'cat-electronics');
-  const [imageUrl, setImageUrl] = useState(initialProduct?.image_url || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800');
+  const [currentPrice, setCurrentPrice] = useState<number>(seed?.current_price || 0);
+  const [originalPrice, setOriginalPrice] = useState<number | undefined>(seed?.original_price || undefined);
+  const [currency, setCurrency] = useState(seed?.currency || 'INR');
+  const [discount, setDiscount] = useState<number | undefined>(seed?.discount || undefined);
+  const [retailer, setRetailer] = useState(seed?.retailer || 'Amazon India');
+  const [categoryId, setCategoryId] = useState(seed?.category_id || categories[0]?.id || '');
+  const [imageUrl, setImageUrl] = useState(seed?.image_url || '');
   const [additionalImages, setAdditionalImages] = useState<string[]>(
     (initialProduct?.images || [])
       .map(img => img.image_url)
       .filter(url => url && url !== initialProduct?.image_url)
   );
   const [urlInput, setUrlInput] = useState('');
-  const [affiliateUrl, setAffiliateUrl] = useState(initialProduct?.affiliate_url || '');
-  const [description, setDescription] = useState(initialProduct?.description || '');
-  const [highlightsText, setHighlightsText] = useState((initialProduct?.highlights || []).join('\n'));
-  const [rating, setRating] = useState<number>(initialProduct?.rating || 4.5);
-  const [reviewCount, setReviewCount] = useState<number>(initialProduct?.review_count || 100);
+  const [affiliateUrl, setAffiliateUrl] = useState(seed?.affiliate_url || '');
+  const [description, setDescription] = useState(seed?.description || '');
+  const [highlightsText, setHighlightsText] = useState((seed?.highlights || []).join('\n'));
+  const [rating, setRating] = useState<number>(seed?.rating ?? 0);
+  const [reviewCount, setReviewCount] = useState<number>(seed?.review_count ?? 0);
   const [featured, setFeatured] = useState(initialProduct?.featured || false);
   const [trending, setTrending] = useState(initialProduct?.trending || false);
   const [status, setStatus] = useState<'draft' | 'published'>(initialProduct?.status === 'published' ? 'published' : 'draft');
@@ -74,25 +79,38 @@ export default function ProductForm({ initialProduct, categories }: ProductFormP
     });
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  const [uploading, setUploading] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const dataUrl = event.target?.result as string;
-        if (dataUrl) {
-          setImageUrl((curr) => {
-            if (!curr) return dataUrl;
-            setAdditionalImages((prev) => [...prev, dataUrl]);
-            return curr;
-          });
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+  /** Uploads to /api/admin/upload (Supabase Storage in live mode) and stores the returned URL. */
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
     e.target.value = '';
+    if (files.length === 0) return;
+    setUploadError(null);
+    setUploading((n) => n + files.length);
+
+    for (const file of files) {
+      try {
+        if (file.size > 5 * 1024 * 1024) throw new Error(`${file.name} is larger than 5 MB.`);
+        const form = new FormData();
+        form.append('file', file);
+        form.append('folder', 'products');
+        const res = await fetch('/api/admin/upload', { method: 'POST', body: form });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.url) throw new Error(data.error || `Could not upload ${file.name}.`);
+        const url: string = data.url;
+        setImageUrl((curr) => {
+          if (!curr) return url;
+          setAdditionalImages((prev) => (prev.includes(url) ? prev : [...prev, url]));
+          return curr;
+        });
+      } catch (err) {
+        setUploadError(err instanceof Error ? err.message : 'Upload failed.');
+      } finally {
+        setUploading((n) => n - 1);
+      }
+    }
   };
 
   const handlePriceChange = (val: number) => {
@@ -110,8 +128,12 @@ export default function ProductForm({ initialProduct, categories }: ProductFormP
   };
 
   const handleSubmit = async (submitStatus: 'draft' | 'published') => {
-    if (!title.trim() || currentPrice <= 0 || !affiliateUrl.trim()) {
-      setFeedback({ type: 'error', message: 'Title, Current Price, and Affiliate URL are required.' });
+    if (!title.trim() || currentPrice <= 0 || !affiliateUrl.trim() || !imageUrl.trim()) {
+      setFeedback({ type: 'error', message: 'Title, current price, affiliate URL and a product image are required.' });
+      return;
+    }
+    if (uploading > 0) {
+      setFeedback({ type: 'error', message: 'Please wait for image uploads to finish.' });
       return;
     }
 
@@ -148,8 +170,10 @@ export default function ProductForm({ initialProduct, categories }: ProductFormP
       affiliate_url: affiliateUrl.trim(),
       description: description.trim() || null,
       highlights,
-      rating,
-      review_count: reviewCount,
+      // 0 means "unknown" — never shown on the storefront or in structured data.
+      rating: rating > 0 ? rating : null,
+      review_count: reviewCount > 0 ? reviewCount : null,
+      source_import_id: sourceImportId,
       featured,
       trending,
       status: submitStatus,
@@ -340,11 +364,11 @@ export default function ProductForm({ initialProduct, categories }: ProductFormP
                   </label>
                   <label className="flex items-center justify-center gap-2 px-3 py-2 bg-white hover:bg-brand-50 border border-dashed border-brand-300 hover:border-brand-500 rounded-xl cursor-pointer text-xs font-semibold text-brand-700 transition-colors shadow-soft-sm">
                     <UploadCloud className="w-4 h-4 text-brand-600" />
-                    <span>Choose Multiple Images</span>
+                    <span>{uploading > 0 ? `Uploading ${uploading}…` : 'Choose Multiple Images'}</span>
                     <input
                       type="file"
                       multiple
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
                       onChange={handleFileUpload}
                       className="hidden"
                     />
@@ -381,6 +405,12 @@ export default function ProductForm({ initialProduct, categories }: ProductFormP
                   </div>
                 </div>
               </div>
+
+              {uploadError && (
+                <p role="alert" className="text-xs font-medium text-red-700">
+                  {uploadError}
+                </p>
+              )}
 
               {/* Visual Gallery Preview Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pt-2">

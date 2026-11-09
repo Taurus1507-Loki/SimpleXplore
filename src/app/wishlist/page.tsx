@@ -2,56 +2,71 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { Heart, Cloud, Smartphone } from 'lucide-react';
 import { useWishlist } from '@/components/WishlistContext';
 import ProductCard from '@/components/ProductCard';
-import { Heart, ArrowRight } from 'lucide-react';
 
 export default function WishlistPage() {
-  const { wishlistProducts } = useWishlist();
+  const { wishlistProducts, syncedToAccount, loading } = useWishlist();
+  const count = wishlistProducts.length;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-      <div className="flex items-center gap-3 border-b border-surface-border pb-4">
-        <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center">
-          <Heart className="w-5 h-5 fill-rose-500" />
-        </div>
+    <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+      <header className="flex flex-col gap-4 border-b border-surface-border pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold font-display text-copy-primary">
-            My Saved Wishlist
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Saved for later</p>
+          <h1 className="font-display text-3xl font-bold tracking-tight text-ink sm:text-[2.75rem] sm:leading-[1.08]">
+            My wishlist
           </h1>
-          <p className="text-xs text-copy-secondary">
-            {wishlistProducts.length} saved product{wishlistProducts.length === 1 ? '' : 's'} to monitor for price drops
+          <p className="mt-2 text-sm text-copy-secondary">
+            {loading ? 'Loading…' : `${count} saved ${count === 1 ? 'product' : 'products'}`}
           </p>
         </div>
-      </div>
 
-      {wishlistProducts.length === 0 ? (
-        <div className="py-20 text-center bg-white rounded-3xl border border-surface-border p-8 max-w-lg mx-auto space-y-4">
-          <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-500 mx-auto flex items-center justify-center">
-            <Heart className="w-8 h-8" />
-          </div>
-          <h3 className="text-lg font-bold text-copy-primary">Your wishlist is currently empty</h3>
-          <p className="text-xs text-copy-secondary">
-            Explore our curated selection of verified affiliate deals and tap the heart icon on any product to save it here.
+        {!loading && (
+          <p
+            className={`inline-flex items-center gap-2 self-start rounded-xl px-3 py-2 text-xs font-medium sm:self-auto ${
+              syncedToAccount ? 'bg-brand-50 text-brand-800' : 'bg-surface-muted text-copy-secondary'
+            }`}
+          >
+            {syncedToAccount ? (
+              <>
+                <Cloud className="h-4 w-4" aria-hidden="true" /> Saved to your account — available on any device
+              </>
+            ) : (
+              <>
+                <Smartphone className="h-4 w-4" aria-hidden="true" /> Saved on this device only.{' '}
+                <Link href="/login" className="font-semibold text-brand-700 underline underline-offset-4">
+                  Sign in
+                </Link>{' '}
+                to keep it everywhere.
+              </>
+            )}
           </p>
-          <div className="pt-2">
-            <Link
-              href="/products"
-              className="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold px-6 py-3 rounded-full transition-all shadow-sm"
-            >
-              <span>Explore Top Deals</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
+        )}
+      </header>
+
+      {!loading && count === 0 ? (
+        <div className="mx-auto max-w-lg rounded-3xl border border-surface-border bg-white px-8 py-16 text-center">
+          <Heart className="mx-auto h-8 w-8 text-brand-600" aria-hidden="true" />
+          <h2 className="mt-4 font-display text-xl font-semibold text-ink">Your wishlist is empty</h2>
+          <p className="mt-2 text-sm text-copy-secondary">Tap the heart on any product to save it here.</p>
+          <Link
+            href="/products"
+            className="mt-6 inline-flex min-h-[44px] items-center rounded-xl bg-brand-600 px-6 text-sm font-semibold text-white hover:bg-brand-700"
+          >
+            Browse products
+          </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-          {wishlistProducts.map(p => (
-            <ProductCard key={p.id} product={p} />
+        <ul className="grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
+          {wishlistProducts.map((p) => (
+            <li key={p.id}>
+              <ProductCard product={p} />
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );
 }
-

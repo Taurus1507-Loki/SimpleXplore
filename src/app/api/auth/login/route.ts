@@ -3,6 +3,9 @@ import {
   ADMIN_SESSION_COOKIE,
   ADMIN_SESSION_MAX_AGE,
   createAdminSessionToken,
+  createCustomerSessionToken,
+  CUSTOMER_SESSION_COOKIE,
+  CUSTOMER_SESSION_MAX_AGE,
   isAdminSessionConfigured,
   safeEqual,
 } from '@/lib/admin-session';
@@ -104,6 +107,17 @@ export async function POST(req: NextRequest) {
       sameSite: 'lax',
       path: '/',
       maxAge: ADMIN_SESSION_MAX_AGE,
+    });
+  }
+
+  // Demo mode: signed customer session so wishlists can be saved per account.
+  if (!isSupabaseConfigured() && isAdminSessionConfigured()) {
+    res.cookies.set(CUSTOMER_SESSION_COOKIE, await createCustomerSessionToken(email), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: CUSTOMER_SESSION_MAX_AGE,
     });
   }
 

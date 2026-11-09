@@ -74,6 +74,42 @@ export async function createAdminSessionToken(email: string, now = Date.now()): 
   return `${body}.${await sign(body, secret)}`;
 }
 
+// --- Customer sessions (demo mode only; live mode uses Supabase Auth sessions) ---
+// Signed over "customer:" + body so an admin token can never verify as a customer token and vice versa.
+
+export const CUSTOMER_SESSION_COOKIE = 'sx_customer_session';
+export const CUSTOMER_SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
+
+export async function createCustomerSessionToken(email: string, now = Date.now()): Promise<string> {
+  const secret = getSecret();
+  if (!secret) throw new Error('ADMIN_SESSION_SECRET is not configured (min 32 characters).');
+  const payload: AdminSessionPayload = {
+    sub: email.toLowerCase().trim(),
+    exp: Math.floor(now / 1000) + CUSTOMER_SESSION_MAX_AGE,
+  };
+  const body = toBase64Url(encoder.encode(JSON.stringify(payload)));
+  return `${body}.${await sign(`customer:${body}`, secret)}`;
+}
+
+export async function verifyCustomerSessionToken(
+  token: string | undefined | null,
+  now = Date.now()
+): Promise<{ email: string } | null> {
+  const secret = getSecret();
+  if (!secret || !token) return null;
+  const [body, sig] = token.split('.');
+  if (!body || !sig) return null;
+  if (!safeEqual(sig, await sign(`customer:${body}`, secret))) return null;
+  try {
+    const payload = JSON.parse(new TextDecoder().decode(fromBase64Url(body))) as AdminSessionPayload;
+    if (typeof payload.sub !== 'string' || typeof payload.exp !== 'number') return null;
+    if (payload.exp * 1000 < now) return null;
+    return { email: payload.sub };
+  } catch {
+    return null;
+  }
+}
+
 export async function verifyAdminSessionToken(
   token: string | undefined | null,
   now = Date.now()

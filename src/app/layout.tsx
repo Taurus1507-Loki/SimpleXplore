@@ -112,7 +112,7 @@ export default async function RootLayout({
         </a>
         <JsonLd data={organizationJsonLd()} />
         <JsonLd data={websiteJsonLd()} />
-        <Providers>
+        <Providers accountKey={initialEmail}>
           <Header initialEmail={initialEmail} initialIsAdmin={Boolean(adminSession)} />
           <main id="main-content" className="flex-1">
             {children}

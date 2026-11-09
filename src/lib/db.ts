@@ -309,6 +309,34 @@ function mapImportRow(row: Row): TelegramImport {
   };
 }
 
+export interface CategoryInput {
+  name: string;
+  slug: string;
+  description?: string | null;
+  image?: string | null;
+  parent_id?: string | null;
+  is_active?: boolean;
+  sort_order?: number;
+}
+
+function toCategoryRow(input: Partial<CategoryInput>): Row {
+  const row: Row = {};
+  for (const key of ['name', 'slug', 'description', 'image', 'parent_id', 'is_active', 'sort_order'] as const) {
+    if (input[key] !== undefined) row[key] = input[key];
+  }
+  if ('parent_id' in row && row.parent_id !== null && !isUuid(row.parent_id)) row.parent_id = null;
+  return row;
+}
+
+function friendlyCategoryError(message?: string): string {
+  if (message && /duplicate key|unique/i.test(message)) return 'Another category already uses this slug.';
+  return message ? `Category could not be saved: ${message}` : 'Category could not be saved.';
+}
+
+function stripUndefined<T extends object>(obj: T): Partial<T> {
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as Partial<T>;
+}
+
 function slugifyTitle(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
@@ -464,6 +492,87 @@ class DataRepository {
   async getCategoryBySlug(slug: string): Promise<Category | null> {
     const categories = await this.getCategories();
     return categories.find(c => c.slug === slug) || null;
+  }
+
+  /** Admin view: every category, including hidden ones. */
+  async getAllCategories(): Promise<Category[]> {
+    const sb = this.supabase();
+    if (sb) {
+      const { data, error } = await sb.from('categories').select('*').order('sort_order', { ascending: true });
+      if (error) throw new Error(`Failed to load categories: ${error.message}`);
+      return (data as Category[]) ?? [];
+    }
+    return [...this.categories].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  }
+
+  async createCategory(input: CategoryInput): Promise<Category> {
+    const sb = this.supabase();
+    if (sb) {
+      const { data, error } = await sb.from('categories').insert(toCategoryRow(input)).select('*').single();
+      if (error || !data) throw new Error(friendlyCategoryError(error?.message));
+      return data as Category;
+    }
+    if (this.categories.some(c => c.slug === input.slug)) throw new Error(friendlyCategoryError('duplicate key slug'));
+    const created: Category = {
+      id: `cat-${input.slug}-${Date.now().toString(36)}`,
+      name: input.name,
+      slug: input.slug,
+      description: input.description ?? null,
+      image: input.image ?? null,
+      parent_id: input.parent_id ?? null,
+      is_active: input.is_active ?? true,
+      sort_order: input.sort_order ?? this.categories.length + 1,
+      created_at: new Date().toISOString(),
+    };
+    this.categories.push(created);
+    return created;
+  }
+
+  async updateCategory(id: string, input: Partial<CategoryInput>): Promise<Category | null> {
+    if (input.parent_id && input.parent_id === id) throw new Error('A category cannot be its own parent.');
+    const sb = this.supabase();
+    if (sb) {
+      if (!isUuid(id)) return null;
+      const { data, error } = await sb
+        .from('categories')
+        .update({ ...toCategoryRow(input), updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select('*')
+        .maybeSingle();
+      if (error) throw new Error(friendlyCategoryError(error.message));
+      return (data as Category) ?? null;
+    }
+    const idx = this.categories.findIndex(c => c.id === id);
+    if (idx === -1) return null;
+    if (input.slug && this.categories.some(c => c.slug === input.slug && c.id !== id)) {
+      throw new Error(friendlyCategoryError('duplicate key slug'));
+    }
+    this.categories[idx] = { ...this.categories[idx], ...stripUndefined(input) };
+    return this.categories[idx];
+  }
+
+  /** Deleting a category keeps its products; they simply become uncategorised. */
+  async deleteCategory(id: string): Promise<boolean> {
+    const sb = this.supabase();
+    if (sb) {
+      if (!isUuid(id)) return false;
+      const { data, error } = await sb.from('categories').delete().eq('id', id).select('id');
+      if (error) throw new Error(`Failed to delete category: ${error.message}`);
+      return (data?.length ?? 0) > 0;
+    }
+    const idx = this.categories.findIndex(c => c.id === id);
+    if (idx === -1) return false;
+    this.categories.splice(idx, 1);
+    for (const p of this.products) if (p.category_id === id) p.category_id = null;
+    for (const c of this.categories) if (c.parent_id === id) c.parent_id = null;
+    return true;
+  }
+
+  async countProductsByCategory(): Promise<Record<string, number>> {
+    const { products } = await this.getProducts({ status: 'all' });
+    const counts: Record<string, number> = {};
+    for (const p of products) if (p.category_id) counts[p.category_id] = (counts[p.category_id] ?? 0) + 1;
+    return counts;
   }
 
   // --- PRODUCTS ---
@@ -1031,6 +1140,76 @@ class DataRepository {
     return true;
   }
 
+  /** Admin-side update of an import record (retry results, manual resolution). Never approves anything. */
+  async updateTelegramImport(
+    id: string,
+    fields: Partial<Pick<TelegramImport, 'product_id' | 'affiliate_url' | 'extracted_data' | 'extraction_status' | 'error_message'>>
+  ): Promise<TelegramImport | null> {
+    const sb = this.supabase();
+    if (sb) {
+      if (!isUuid(id)) return null;
+      const row: Row = { updated_at: new Date().toISOString() };
+      for (const [k, v] of Object.entries(fields)) if (v !== undefined) row[k] = v;
+      if ('product_id' in row && row.product_id !== null && !isUuid(row.product_id)) row.product_id = null;
+      const { data, error } = await sb.from('telegram_imports').update(row).eq('id', id).select('*').maybeSingle();
+      if (error) throw new Error(`Failed to update Telegram import: ${error.message}`);
+      return data ? mapImportRow(data) : null;
+    }
+    const idx = this.telegramImports.findIndex(i => i.id === id);
+    if (idx === -1) return null;
+    this.telegramImports[idx] = {
+      ...this.telegramImports[idx],
+      ...stripUndefined(fields),
+      updated_at: new Date().toISOString(),
+    };
+    return this.telegramImports[idx];
+  }
+
+  // --- WISHLISTS (per customer; userId always comes from a verified server session) ---
+  async getWishlistProductIds(userId: string): Promise<string[]> {
+    const sb = this.supabase();
+    if (sb) {
+      if (!isUuid(userId)) return [];
+      const { data, error } = await sb
+        .from('wishlists')
+        .select('product_id, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true });
+      if (error) throw new Error(`Failed to load wishlist: ${error.message}`);
+      return (data ?? []).map((r: Row) => r.product_id as string);
+    }
+    return [...(this.wishlists[userId] ?? [])];
+  }
+
+  /** Only published products can be saved. Returns false if the product isn't available. */
+  async addToWishlist(userId: string, productId: string): Promise<boolean> {
+    const product = await this.getProductById(productId);
+    if (!product || product.status !== 'published') return false;
+    const sb = this.supabase();
+    if (sb) {
+      if (!isUuid(userId)) return false;
+      const { error } = await sb
+        .from('wishlists')
+        .upsert({ user_id: userId, product_id: productId }, { onConflict: 'user_id,product_id', ignoreDuplicates: true });
+      if (error) throw new Error(`Failed to save to wishlist: ${error.message}`);
+      return true;
+    }
+    const list = (this.wishlists[userId] ??= []);
+    if (!list.includes(productId)) list.push(productId);
+    return true;
+  }
+
+  async removeFromWishlist(userId: string, productId: string): Promise<void> {
+    const sb = this.supabase();
+    if (sb) {
+      if (!isUuid(userId) || !isUuid(productId)) return;
+      const { error } = await sb.from('wishlists').delete().eq('user_id', userId).eq('product_id', productId);
+      if (error) throw new Error(`Failed to remove from wishlist: ${error.message}`);
+      return;
+    }
+    this.wishlists[userId] = (this.wishlists[userId] ?? []).filter(id => id !== productId);
+  }
+
   // --- AFFILIATE CLICKS & ANALYTICS ---
   async trackAffiliateClick(data: {
     productId: string;
@@ -1182,4 +1361,8 @@ class DataRepository {
   }
 }
 
-export const db = new DataRepository();
+// One repository per server process. Next.js can evaluate this module more than once
+// (separate route bundles, dev hot reload), which would otherwise give each route its own
+// demo-mode memory — e.g. a category created via the API invisible to the public page.
+const globalForDb = globalThis as unknown as { __sxDataRepository?: DataRepository };
+export const db = globalForDb.__sxDataRepository ?? (globalForDb.__sxDataRepository = new DataRepository());

@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import Logo from '@/components/Logo';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import { UserPlus, ArrowRight } from 'lucide-react';
 
 export default function RegisterPage() {
@@ -12,6 +11,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -21,33 +21,24 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const supabase = createClient();
-      // Public registrations are strictly customers. Admin role is never assignable from public form.
-      const { error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            role: 'customer', // Enforced
-          },
-        },
+      // Server-side sign-up: public registrations are always customers.
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password, fullName }),
       });
-
-      if (signUpError) {
-        if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true' || signUpError.message.includes('placeholder')) {
-          document.cookie = `sx_user_email=${encodeURIComponent(email.trim())}; path=/; max-age=86400`;
-          router.push('/products');
-          router.refresh();
-          return;
-        }
-        setError(signUpError.message);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || 'Registration failed.');
         setLoading(false);
         return;
       }
-
-      document.cookie = `sx_user_email=${encodeURIComponent(email.trim())}; path=/; max-age=86400`;
-      router.push('/products');
+      if (data.needsConfirmation) {
+        setNotice('Check your inbox to confirm your email, then sign in.');
+        setLoading(false);
+        return;
+      }
+      router.push(data.redirect || '/products');
       router.refresh();
     } catch {
       setError('An error occurred during registration.');
@@ -73,6 +64,11 @@ export default function RegisterPage() {
         {error && (
           <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs">
             {error}
+          </div>
+        )}
+        {notice && (
+          <div role="status" className="p-3 rounded-xl bg-brand-50 border border-brand-200 text-brand-800 text-xs">
+            {notice}
           </div>
         )}
 
@@ -110,10 +106,10 @@ export default function RegisterPage() {
               id="password"
               type="password"
               required
-              minLength={6}
+              minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 6 characters"
+              placeholder="At least 8 characters"
               className="w-full px-3.5 py-2.5 rounded-xl border border-surface-border focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 text-copy-primary"
             />
           </div>

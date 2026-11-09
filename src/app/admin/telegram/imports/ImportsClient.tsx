@@ -16,7 +16,10 @@ import {
   CheckSquare, 
   Square, 
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  RotateCcw,
+  PenLine,
+  Loader2
 } from 'lucide-react';
 
 interface ImportsClientProps {
@@ -31,6 +34,32 @@ export default function ImportsClient({ initialImports, statusFilter }: ImportsC
   const [loading, setLoading] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [retrying, setRetrying] = useState<string | null>(null);
+
+  /** Re-run extraction for a failed import. Success creates a DRAFT — nothing is published. */
+  const handleRetry = async (id: string) => {
+    setRetrying(id);
+    setFeedback(null);
+    try {
+      const res = await fetch('/api/admin/telegram/retry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ importId: id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.import) setImports(prev => prev.map(i => (i.id === id ? { ...i, ...data.import } : i)));
+      if (res.ok && data.success) {
+        setFeedback({ type: 'success', message: 'Retry worked — a new draft is ready for review.' });
+      } else {
+        setFeedback({ type: 'error', message: `Retry failed: ${data.error || 'unknown error'}. You can create the product manually instead.` });
+      }
+      router.refresh();
+    } catch {
+      setFeedback({ type: 'error', message: 'Network error while retrying.' });
+    } finally {
+      setRetrying(null);
+    }
+  };
 
   // Toggle single item selection
   const toggleSelect = (id: string) => {
@@ -41,7 +70,7 @@ export default function ImportsClient({ initialImports, statusFilter }: ImportsC
 
   // Toggle select all visible pending items
   const toggleSelectAll = () => {
-    const pendingIds = imports.filter(i => i.review_status === 'pending').map(i => i.id);
+    const pendingIds = imports.filter(i => i.review_status === 'pending' && i.extraction_status !== 'failed').map(i => i.id);
     if (selectedIds.length === pendingIds.length) {
       setSelectedIds([]);
     } else {
@@ -200,9 +229,11 @@ export default function ImportsClient({ initialImports, statusFilter }: ImportsC
               >
                 <div className="flex items-start gap-4 flex-1 min-w-0">
                   {/* Selection Checkbox for Pending drafts */}
-                  {isPending && (
+                  {isPending && !isFailed && (
                     <button
                       type="button"
+                      aria-label={isSelected ? 'Deselect' : 'Select for bulk approval'}
+                      aria-pressed={isSelected}
                       onClick={() => toggleSelect(item.id)}
                       className="mt-1 text-copy-secondary hover:text-brand-600 transition-colors"
                     >
@@ -261,6 +292,12 @@ export default function ImportsClient({ initialImports, statusFilter }: ImportsC
                       {item.extracted_data.title || 'Extracted Product Draft'}
                     </h3>
 
+                    {isFailed && item.error_message && (
+                      <p className="text-xs text-red-800 bg-red-50 border border-red-200 px-2 py-1 rounded-md line-clamp-2">
+                        {item.error_message}
+                      </p>
+                    )}
+
                     {item.extracted_data.raw_message && (
                       <p className="text-xs text-copy-secondary line-clamp-1 italic bg-[#F8FAF8] px-2 py-1 rounded-md border border-surface-border/50">
                         &ldquo;{item.extracted_data.raw_message}&rdquo;
@@ -295,13 +332,34 @@ export default function ImportsClient({ initialImports, statusFilter }: ImportsC
                     )}
                   </div>
 
-                  <Link
-                    href={`/admin/telegram/imports/${item.id}`}
-                    className="inline-flex items-center gap-1.5 bg-brand-500 hover:bg-brand-600 active:scale-95 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-soft-sm transition-all"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                    <span>Review &amp; Approve</span>
-                  </Link>
+                  {isFailed && !item.product_id ? (
+                    <div className="flex flex-wrap gap-2 md:justify-end">
+                      <button
+                        type="button"
+                        onClick={() => handleRetry(item.id)}
+                        disabled={retrying !== null}
+                        className="inline-flex items-center gap-1.5 bg-brand-500 hover:bg-brand-600 active:scale-95 disabled:opacity-60 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-soft-sm transition-all"
+                      >
+                        {retrying === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                        <span>{retrying === item.id ? 'Retrying…' : 'Retry'}</span>
+                      </button>
+                      <Link
+                        href={`/admin/products/new?fromImport=${encodeURIComponent(item.id)}`}
+                        className="inline-flex items-center gap-1.5 bg-white border border-surface-border hover:border-brand-300 text-copy-primary font-semibold text-xs px-4 py-2.5 rounded-xl transition-all"
+                      >
+                        <PenLine className="w-3.5 h-3.5" />
+                        <span>Create manually</span>
+                      </Link>
+                    </div>
+                  ) : (
+                    <Link
+                      href={`/admin/telegram/imports/${item.id}`}
+                      className="inline-flex items-center gap-1.5 bg-brand-500 hover:bg-brand-600 active:scale-95 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-soft-sm transition-all"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Review &amp; Approve</span>
+                    </Link>
+                  )}
                 </div>
               </div>
             );

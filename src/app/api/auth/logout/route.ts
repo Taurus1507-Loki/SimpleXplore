@@ -15,6 +15,7 @@ export async function POST() {
   const res = NextResponse.json({ success: true });
   res.cookies.set(ADMIN_SESSION_COOKIE, '', { path: '/', maxAge: 0 });
   res.cookies.set('sx_user_email', '', { path: '/', maxAge: 0 });
+  res.cookies.set('sx_customer_session', '', { path: '/', maxAge: 0 });
   res.cookies.set('sx_admin_demo', '', { path: '/', maxAge: 0 }); // legacy cookie
   return res;
 }
