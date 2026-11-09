@@ -157,6 +157,15 @@ function LoginForm() {
           </p>
         </div>
       </div>
+
+      <div className="text-center">
+        <Link
+          href="/"
+          className="text-xs font-semibold text-copy-secondary hover:text-brand-600 transition-colors inline-flex items-center gap-1"
+        >
+          <span>← Back to Storefront</span>
+        </Link>
+      </div>
     </div>
   );
 }

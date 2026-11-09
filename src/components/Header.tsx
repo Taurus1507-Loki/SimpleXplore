@@ -68,8 +68,8 @@ export default function Header() {
     checkAuth();
   }, [pathname]);
 
-  // Hide public customer header completely on admin pages (AFTER all hooks)
-  if (pathname.startsWith('/admin')) {
+  // Hide customer navbar on admin pages and auth pages (login / register)
+  if (pathname.startsWith('/admin') || pathname === '/login' || pathname === '/register') {
     return null;
   }
 

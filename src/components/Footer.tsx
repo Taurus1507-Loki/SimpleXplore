@@ -8,8 +8,8 @@ import { Send, Twitter, Instagram, Heart } from 'lucide-react';
 export default function Footer() {
   const pathname = usePathname();
 
-  // Hide footer on admin pages
-  if (pathname.startsWith('/admin')) {
+  // Hide footer on admin pages and auth pages (login / register)
+  if (pathname.startsWith('/admin') || pathname === '/login' || pathname === '/register') {
     return null;
   }
 
