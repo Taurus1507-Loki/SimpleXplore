@@ -1,3 +1,4 @@
+import { audit } from '@/lib/audit';
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
@@ -53,6 +54,7 @@ export async function POST(req: NextRequest) {
       );
     }
     const { data } = sb.storage.from(BUCKET).getPublicUrl(name);
+    await audit('image.upload', 'image', null, { path: name, bytes: file.size });
     return NextResponse.json({ url: data.publicUrl });
   }
 
@@ -60,5 +62,6 @@ export async function POST(req: NextRequest) {
   const target = path.join(process.cwd(), 'public', 'uploads', name);
   await fs.mkdir(path.dirname(target), { recursive: true });
   await fs.writeFile(target, bytes);
+  await audit('image.upload', 'image', null, { path: name, bytes: file.size });
   return NextResponse.json({ url: `/uploads/${name}` });
 }

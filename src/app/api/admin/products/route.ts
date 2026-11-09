@@ -1,3 +1,4 @@
+import { audit } from '@/lib/audit';
 import { requireAdminApi } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
@@ -32,6 +33,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    await audit('product.create', 'product', product.id, { title: product.title, status: product.status, from_import: sourceImportId || undefined });
     return NextResponse.json({ success: true, product });
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : String(error);
@@ -50,6 +52,12 @@ export async function PATCH(req: NextRequest) {
     }
 
     const updated = await db.updateProduct(data.id, data);
+    await audit(
+      data.status && Object.keys(data).length <= 2 ? (data.status === 'published' ? 'product.publish' : 'product.unpublish') : 'product.update',
+      'product',
+      data.id,
+      { title: updated?.title, fields: Object.keys(data).filter(k => k !== 'id') }
+    );
     return NextResponse.json({ success: true, product: updated });
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : String(error);
@@ -72,6 +80,7 @@ export async function DELETE(req: NextRequest) {
           await db.deleteProduct(p.id);
         }
       }
+      await audit('product.clear_demo_defaults', 'product', null);
       return NextResponse.json({ success: true, message: 'Default products cleared.' });
     }
 
@@ -80,6 +89,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     const success = await db.deleteProduct(id);
+    if (success) await audit('product.delete', 'product', id);
     return NextResponse.json({ success });
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : String(error);

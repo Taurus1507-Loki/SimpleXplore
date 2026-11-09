@@ -1,3 +1,4 @@
+import { audit } from '@/lib/audit';
 import { requireAdminApi } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
@@ -18,11 +19,13 @@ export async function POST(req: NextRequest) {
       if (!result.success) {
         return NextResponse.json({ error: result.error || 'Approval failed' }, { status: 500 });
       }
+      await audit('telegram.approve_publish', 'telegram_import', importId, { product_id: result.product?.id, title: result.product?.title });
       return NextResponse.json({ success: true, product: result.product });
     }
 
     if (action === 'reject') {
       const success = await db.rejectTelegramImport(importId);
+      if (success) await audit('telegram.reject', 'telegram_import', importId);
       return NextResponse.json({ success });
     }
 

@@ -1,3 +1,5 @@
+import { audit } from '@/lib/audit';
+import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   ADMIN_SESSION_COOKIE,
@@ -80,6 +82,7 @@ export async function POST(req: NextRequest) {
     const adminPassword = process.env.ADMIN_PASSWORD;
     if (adminEmail && email === adminEmail) {
       if (!adminPassword || !safeEqual(password, adminPassword)) {
+        await audit('admin.login_failed', 'session', null, { ip }, null);
         return NextResponse.json({ error: INVALID }, { status: 401 });
       }
       isAdmin = true;
@@ -101,6 +104,7 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
+    await audit('admin.login', 'session', null, { ip }, email);
     res.cookies.set(ADMIN_SESSION_COOKIE, await createAdminSessionToken(email), {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -112,6 +116,7 @@ export async function POST(req: NextRequest) {
 
   // Demo mode: signed customer session so wishlists can be saved per account.
   if (!isSupabaseConfigured() && isAdminSessionConfigured()) {
+    if (!isAdmin) await db.recordDemoCustomer(email);
     res.cookies.set(CUSTOMER_SESSION_COOKIE, await createCustomerSessionToken(email), {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

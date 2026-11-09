@@ -250,6 +250,13 @@ export default function ReviewClient({ initialImport, categories }: ReviewClient
             <h3 className="text-xs uppercase tracking-wider font-bold text-copy-secondary">
               Original Telegram Post Source:
             </h3>
+            {(ext.channel_name || ext.message_date) && (
+              <p className="text-xs text-copy-secondary">
+                {ext.channel_name && <>Channel: <strong className="text-copy-primary">{ext.channel_name}</strong></>}
+                {ext.channel_name && ext.message_date && ' · '}
+                {ext.message_date && <>Posted {new Date(ext.message_date).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</>}
+              </p>
+            )}
             {ext.raw_message ? (
               <div className="p-3.5 rounded-2xl bg-[#F8FAF8] border border-surface-border text-xs text-copy-primary font-mono whitespace-pre-wrap">
                 {ext.raw_message}

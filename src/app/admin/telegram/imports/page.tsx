@@ -14,7 +14,14 @@ export const dynamic = 'force-dynamic';
 
 export default async function TelegramImportsPage({ searchParams }: TelegramImportsPageProps) {
   const statusFilter = searchParams.status || 'pending';
-  const allImports = await db.getTelegramImports();
+  const [allImports, postsReceived, queue] = await Promise.all([
+    db.getTelegramImports(),
+    db.getTelegramPostCount(),
+    db.getTelegramQueueStats(),
+  ]);
+  // Every link found in a post gets its own import record, so records = links detected.
+  const linksDetected = allImports.length;
+  const importedOk = allImports.filter(i => i.extraction_status !== 'failed').length;
 
   // Summary counts
   const totalReceived = allImports.length;
@@ -53,6 +60,21 @@ export default async function TelegramImportsPage({ searchParams }: TelegramImpo
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </div>
+
+      {/* Pipeline totals */}
+      <dl className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {[
+          { label: 'Telegram posts received', value: postsReceived, note: queue.pending > 0 ? `${queue.pending} still processing` : 'All processed' },
+          { label: 'Links detected', value: linksDetected, note: 'One draft per product link' },
+          { label: 'Imported successfully', value: importedOk, note: `${linksDetected - importedOk} could not be read` },
+        ].map(stat => (
+          <div key={stat.label} className="rounded-2xl border border-surface-border bg-white p-4">
+            <dt className="text-[11px] font-semibold uppercase tracking-wider text-copy-secondary">{stat.label}</dt>
+            <dd className="mt-1 font-display text-2xl font-bold text-copy-primary tabular">{stat.value}</dd>
+            <dd className="text-[11px] text-copy-muted">{stat.note}</dd>
+          </div>
+        ))}
+      </dl>
 
       {/* Stats Quick Badges & Required Filters */}
       <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">

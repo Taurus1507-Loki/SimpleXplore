@@ -210,7 +210,11 @@ export async function retryTelegramImport(importId: string): Promise<RetryResult
     const updated = await db.updateTelegramImport(importId, {
       product_id: draftProduct.id,
       affiliate_url: listing.resolvedUrl,
-      extracted_data: listing.extractedPayload,
+      extracted_data: {
+        ...listing.extractedPayload,
+        channel_name: item.extracted_data?.channel_name,
+        message_date: item.extracted_data?.message_date,
+      },
       extraction_status: listing.extractionStatus,
       error_message: null,
     });
@@ -243,6 +247,11 @@ export async function processTelegramPost(
   const channelId = String(post.chat.id);
   const channelName = post.chat.title || post.chat.username || channelId;
   const priceHints = extractPriceHintsFromText(messageText);
+  // Shown on each draft in the admin review queue.
+  const postMeta = {
+    channel_name: channelName,
+    message_date: post.date ? new Date(post.date * 1000).toISOString() : undefined,
+  };
 
   for (const rawUrl of detectedUrls) {
     // 1. SSRF Safety Check
@@ -271,7 +280,7 @@ export async function processTelegramPost(
           product_id: duplicateProduct.id,
           original_url: rawUrl,
           affiliate_url: resolvedUrl,
-          extracted_data: extractedPayload,
+          extracted_data: { ...extractedPayload, ...postMeta },
           extraction_status: listing.extractionStatus,
           review_status: 'pending',
         });
@@ -288,7 +297,7 @@ export async function processTelegramPost(
           product_id: duplicateProduct.id,
           original_url: rawUrl,
           affiliate_url: resolvedUrl,
-          extracted_data: { ...extractedPayload, pending_update: true },
+          extracted_data: { ...extractedPayload, ...postMeta, pending_update: true },
           extraction_status: listing.extractionStatus,
           review_status: 'pending',
         });
@@ -306,7 +315,7 @@ export async function processTelegramPost(
         product_id: draftProduct.id,
         original_url: rawUrl,
         affiliate_url: resolvedUrl,
-        extracted_data: extractedPayload,
+        extracted_data: { ...extractedPayload, ...postMeta },
         extraction_status: listing.extractionStatus,
         review_status: 'pending',
       });
@@ -322,6 +331,7 @@ export async function processTelegramPost(
         original_url: rawUrl,
         affiliate_url: rawUrl,
         extracted_data: {
+          ...postMeta,
           raw_message: messageText,
           retailer: detectRetailer(rawUrl),
         },

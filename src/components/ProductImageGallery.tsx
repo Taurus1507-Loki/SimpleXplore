@@ -18,7 +18,10 @@ export default function ProductImageGallery({
   // Collect all unique images (primary first)
   const allImages = [
     primaryImage,
-    ...images.map((img) => img.image_url).filter((url) => url && url !== primaryImage),
+    ...[...images]
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      .map((img) => img.image_url)
+      .filter((url, i, all) => url && url !== primaryImage && all.indexOf(url) === i),
   ];
 
   const [activeImage, setActiveImage] = useState(primaryImage || allImages[0]);

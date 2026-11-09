@@ -123,6 +123,9 @@ export interface TelegramImport {
     is_duplicate?: boolean;
     /** Fields extraction could not verify; left blank for the admin to complete. */
     missing_fields?: string[];
+    /** Telegram channel the post came from, and when it was posted (ISO). */
+    channel_name?: string;
+    message_date?: string;
     /** Set when an edited Telegram post targets an already-published product. */
     pending_update?: boolean;
     duplicate_of_id?: string;

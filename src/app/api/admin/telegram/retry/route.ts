@@ -1,3 +1,4 @@
+import { audit } from '@/lib/audit';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminApi } from '@/lib/auth';
 import { retryTelegramImport } from '@/lib/telegram/service';
@@ -21,6 +22,7 @@ export async function POST(req: NextRequest) {
   }
 
   const result = await retryTelegramImport(importId);
+  await audit('telegram.retry', 'telegram_import', importId, { ok: result.ok, error: result.ok ? undefined : result.error });
   if (!result.ok) {
     return NextResponse.json({ success: false, error: result.error, import: result.import ?? null }, { status: 422 });
   }

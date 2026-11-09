@@ -87,8 +87,15 @@ class Query implements PromiseLike<Result> {
     const plain = this.columns.replace(/(\w+):(\w+)\(\*\)/g, '').split(',').map(s => s.trim()).filter(Boolean);
     const out: Row = plain.includes('*') || plain.length === 0 ? { ...row } : Object.fromEntries(plain.map(c => [c, row[c]]));
     for (const [, alias, foreign] of embeds) {
-      const fk = row[`${alias}_id`];
-      out[alias] = (this.fake.tables[foreign] ?? []).find(r => r.id === fk) ?? null;
+      if (`${alias}_id` in row) {
+        // many-to-one, e.g. category:categories(*) via products.category_id
+        const fk = row[`${alias}_id`];
+        out[alias] = (this.fake.tables[foreign] ?? []).find(r => r.id === fk) ?? null;
+      } else {
+        // one-to-many, e.g. images:product_images(*) via product_images.product_id
+        const backRef = `${this.table.replace(/s$/, '')}_id`;
+        out[alias] = (this.fake.tables[foreign] ?? []).filter(r => r[backRef] === row.id).map(r => ({ ...r }));
+      }
     }
     return out;
   }

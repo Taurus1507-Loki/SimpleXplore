@@ -254,6 +254,19 @@ export function isUuid(value: unknown): value is string {
   return typeof value === 'string' && UUID_RE.test(value);
 }
 
+/** Product row + category + gallery images (product_images). */
+const PRODUCT_DETAIL_SELECT = '*, category:categories(*), images:product_images(*)';
+
+/** Normalise gallery input (objects or URLs) into unique https/uploaded URLs, in order. */
+function galleryUrls(images: unknown): string[] {
+  if (!Array.isArray(images)) return [];
+  const urls = images
+    .map((img) => (typeof img === 'string' ? img : (img as { image_url?: string })?.image_url))
+    .filter((u): u is string => typeof u === 'string' && u.trim().length > 0)
+    .map((u) => u.trim());
+  return Array.from(new Set(urls)).slice(0, 20);
+}
+
 /** Columns of `public.products` that callers may write. Anything else is dropped. */
 const PRODUCT_WRITABLE_COLUMNS = [
   'title', 'slug', 'description', 'highlights', 'category_id', 'retailer',
@@ -307,6 +320,25 @@ function mapImportRow(row: Row): TelegramImport {
     extracted_data: rest.extracted_data ?? {},
     product: product ?? undefined,
   };
+}
+
+export interface CustomerSummary {
+  id: string;
+  email: string;
+  full_name: string | null;
+  created_at: string;
+  last_seen_at: string | null;
+  wishlist_count: number;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  admin_email: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  details: Record<string, unknown>;
+  created_at: string;
 }
 
 export const TELEGRAM_MAX_ATTEMPTS = 3;
@@ -447,6 +479,8 @@ class DataRepository {
   private wishlists: Record<string, string[]> = {}; // userId -> productIds[]
   private processedTelegramUpdates = new Set<number>(); // demo-mode webhook idempotency
   private telegramQueue: QueuedTelegramUpdate[] = []; // demo-mode processing queue
+  private auditLogs: AuditLogEntry[] = []; // demo-mode audit log
+  private demoCustomers = new Map<string, Omit<CustomerSummary, 'wishlist_count'>>(); // demo-mode shoppers
 
   constructor() {
     // Add pending draft products from initial Telegram imports to the products table with status 'draft'
@@ -703,7 +737,7 @@ class DataRepository {
         const supabase = createAdminClient();
         const { data, error } = await supabase
           .from('products')
-          .select('*, category:categories(*)')
+          .select(PRODUCT_DETAIL_SELECT)
           .eq('slug', slug)
           .single();
         if (!error && data) return data as Product;
@@ -731,7 +765,7 @@ class DataRepository {
       if (!isUuid(id)) return null; // would be a Postgres cast error
       const { data, error } = await sb
         .from('products')
-        .select('*, category:categories(*)')
+        .select(PRODUCT_DETAIL_SELECT)
         .eq('id', id)
         .maybeSingle();
       if (error) {
@@ -785,10 +819,14 @@ class DataRepository {
       const { data: inserted, error } = await sb
         .from('products')
         .insert(row)
-        .select('*, category:categories(*)')
+        .select(PRODUCT_DETAIL_SELECT)
         .single();
       if (error || !inserted) {
         throw new Error(`Failed to save product: ${error?.message ?? 'no row returned'}`);
+      }
+      if (galleryUrls(data.images).length > 0) {
+        await this.replaceProductImages(sb, inserted.id, data.images);
+        return (await this.getProductById(inserted.id)) ?? (inserted as Product);
       }
       return inserted as Product;
     }
@@ -805,9 +843,13 @@ class DataRepository {
         .from('products')
         .update({ ...toProductRow(updates), updated_at: new Date().toISOString() })
         .eq('id', id)
-        .select('*, category:categories(*)')
+        .select(PRODUCT_DETAIL_SELECT)
         .maybeSingle();
       if (error) throw new Error(`Failed to update product: ${error.message}`);
+      if (data && updates.images !== undefined) {
+        await this.replaceProductImages(sb, id, updates.images);
+        return this.getProductById(id);
+      }
       return (data as Product) ?? null;
     }
 
@@ -821,6 +863,163 @@ class DataRepository {
     };
 
     return this.products[index];
+  }
+
+  // --- CUSTOMERS (admin view) ---
+  /** Demo mode only: remember shoppers who registered or signed in (live mode uses public.profiles). */
+  async recordDemoCustomer(email: string, fullName?: string | null): Promise<void> {
+    if (this.supabase()) return;
+    const key = email.toLowerCase().trim();
+    const existing = this.demoCustomers.get(key);
+    const now = new Date().toISOString();
+    this.demoCustomers.set(key, {
+      id: `demo:${key}`,
+      email: key,
+      full_name: fullName || existing?.full_name || null,
+      created_at: existing?.created_at ?? now,
+      last_seen_at: now,
+    });
+  }
+
+  async getCustomers(params: { search?: string; limit?: number; offset?: number } = {}): Promise<{ customers: CustomerSummary[]; total: number }> {
+    const limit = Math.min(params.limit ?? 50, 200);
+    const offset = params.offset ?? 0;
+    const search = params.search?.trim().toLowerCase() || '';
+    const sb = this.supabase();
+
+    if (sb) {
+      let q = sb
+        .from('profiles')
+        .select('id, email, full_name, created_at', { count: 'exact' })
+        .eq('role', 'customer')
+        .order('created_at', { ascending: false });
+      if (search) q = q.or(`email.ilike.%${search.replace(/[%,()]/g, '')}%,full_name.ilike.%${search.replace(/[%,()]/g, '')}%`);
+      const { data, error, count } = await q.range(offset, offset + limit - 1);
+      if (error) throw new Error(`Failed to load customers: ${error.message}`);
+      const rows = (data as Row[]) ?? [];
+      const ids = rows.map((r) => r.id);
+      const counts: Record<string, number> = {};
+      if (ids.length) {
+        const { data: wl } = await sb.from('wishlists').select('user_id').in('user_id', ids);
+        for (const w of (wl as Row[]) ?? []) counts[w.user_id] = (counts[w.user_id] ?? 0) + 1;
+      }
+      return {
+        customers: rows.map((r) => ({
+          id: r.id,
+          email: r.email,
+          full_name: r.full_name ?? null,
+          created_at: r.created_at,
+          last_seen_at: null,
+          wishlist_count: counts[r.id] ?? 0,
+        })),
+        total: count ?? rows.length,
+      };
+    }
+
+    const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase().trim();
+    let list = Array.from(this.demoCustomers.values()).filter((c) => c.email !== adminEmail);
+    if (search) list = list.filter((c) => c.email.includes(search) || (c.full_name ?? '').toLowerCase().includes(search));
+    list.sort((a, b) => b.created_at.localeCompare(a.created_at));
+    return {
+      customers: list.slice(offset, offset + limit).map((c) => ({ ...c, wishlist_count: (this.wishlists[c.id] ?? []).length })),
+      total: list.length,
+    };
+  }
+
+  // --- AUDIT LOG (append-only) ---
+  async recordAudit(entry: Omit<AuditLogEntry, 'id' | 'created_at'>): Promise<void> {
+    // Keep details small and free of secrets/huge blobs.
+    const details = JSON.parse(JSON.stringify(entry.details ?? {}, (_k, v) => (typeof v === 'string' && v.length > 500 ? v.slice(0, 500) + '…' : v)));
+    const sb = this.supabase();
+    if (sb) {
+      const row: Row = {
+        admin_email: entry.admin_email,
+        action: entry.action,
+        entity_type: entry.entity_type,
+        // entity_id is a UUID column; keep non-UUID ids (e.g. settings) in details.
+        entity_id: isUuid(entry.entity_id) ? entry.entity_id : null,
+        details: isUuid(entry.entity_id) || !entry.entity_id ? details : { ...details, ref: entry.entity_id },
+      };
+      const { error } = await sb.from('admin_audit_logs').insert(row);
+      if (error) throw new Error(`Failed to write audit log: ${error.message}`);
+      return;
+    }
+    this.auditLogs.unshift({
+      id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      created_at: new Date().toISOString(),
+      ...entry,
+      details,
+    });
+    if (this.auditLogs.length > 2000) this.auditLogs.length = 2000;
+  }
+
+  async getAuditLogs(params: { limit?: number; offset?: number; entityType?: string } = {}): Promise<{ entries: AuditLogEntry[]; total: number }> {
+    const limit = Math.min(params.limit ?? 50, 200);
+    const offset = params.offset ?? 0;
+    const sb = this.supabase();
+    if (sb) {
+      let q = sb.from('admin_audit_logs').select('*', { count: 'exact' }).order('created_at', { ascending: false });
+      if (params.entityType) q = q.eq('entity_type', params.entityType);
+      const { data, error, count } = await q.range(offset, offset + limit - 1);
+      if (error) throw new Error(`Failed to load audit log: ${error.message}`);
+      return {
+        entries: ((data as Row[]) ?? []).map((r) => ({
+          id: r.id,
+          admin_email: r.admin_email ?? null,
+          action: r.action,
+          entity_type: r.entity_type,
+          entity_id: r.entity_id ?? r.details?.ref ?? null,
+          details: r.details ?? {},
+          created_at: r.created_at,
+        })),
+        total: count ?? 0,
+      };
+    }
+    const list = params.entityType ? this.auditLogs.filter((e) => e.entity_type === params.entityType) : this.auditLogs;
+    return { entries: list.slice(offset, offset + limit), total: list.length };
+  }
+
+  /** Copy a product as a new DRAFT (never published, not featured/trending), including its gallery. */
+  async duplicateProduct(id: string): Promise<Product | null> {
+    const original = await this.getProductById(id);
+    if (!original) return null;
+    const suffix = Math.random().toString(36).slice(2, 6);
+    const baseSlug = original.slug.replace(/-copy(-[a-z0-9]{4})?$/, '');
+    return this.createProduct({
+      title: `${original.title} (copy)`.slice(0, 250),
+      slug: `${baseSlug}-copy-${suffix}`,
+      description: original.description ?? null,
+      highlights: original.highlights ?? [],
+      category_id: original.category_id ?? null,
+      retailer: original.retailer,
+      current_price: original.current_price,
+      original_price: original.original_price ?? null,
+      currency: original.currency,
+      discount: original.discount ?? null,
+      rating: original.rating ?? null,
+      review_count: original.review_count ?? null,
+      image_url: original.image_url,
+      images: (original.images ?? []).map((img) => ({ ...img, id: '', product_id: '' })),
+      affiliate_url: original.affiliate_url,
+      seo_title: null,
+      seo_description: original.seo_description ?? null,
+      featured: false,
+      trending: false,
+      status: 'draft',
+      source_type: 'manual',
+    });
+  }
+
+  /** Replace a product's gallery rows with the given images (order preserved). */
+  private async replaceProductImages(sb: SupabaseAdmin, productId: string, images: unknown): Promise<void> {
+    const urls = galleryUrls(images);
+    const { error: delError } = await sb.from('product_images').delete().eq('product_id', productId);
+    if (delError) throw new Error(`Failed to update product images: ${delError.message}`);
+    if (urls.length === 0) return;
+    const { error } = await sb
+      .from('product_images')
+      .insert(urls.map((image_url, sort_order) => ({ product_id: productId, image_url, sort_order })));
+    if (error) throw new Error(`Failed to save product images: ${error.message}`);
   }
 
   async deleteProduct(id: string): Promise<boolean> {
@@ -953,6 +1152,20 @@ class DataRepository {
     item.status = status;
     item.locked_at = outcome.ok || finalFailure ? null : new Date().toISOString();
     if (outcome.ok) this.telegramQueue = this.telegramQueue.filter((q) => q.update_id !== updateId);
+  }
+
+  /** Total Telegram channel posts received by the webhook (each update counted once). */
+  async getTelegramPostCount(): Promise<number> {
+    const sb = this.supabase();
+    if (sb) {
+      const { count, error } = await sb.from('telegram_updates').select('id', { count: 'exact', head: true });
+      if (error) {
+        console.error('Failed to count Telegram updates:', error.message);
+        return 0;
+      }
+      return count ?? 0;
+    }
+    return this.processedTelegramUpdates.size;
   }
 
   /** Counts for the admin dashboard. */

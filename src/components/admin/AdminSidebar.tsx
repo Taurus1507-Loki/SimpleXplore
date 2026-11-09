@@ -19,7 +19,9 @@ import {
   AlertCircle,
   LogOut,
   Globe,
-  ArrowRight
+  ArrowRight,
+  Users,
+  ScrollText
 } from 'lucide-react';
 
 export default function AdminSidebar() {
@@ -54,6 +56,8 @@ export default function AdminSidebar() {
       badge: 'Drafts'
     },
     { label: 'Click Analytics', href: '/admin/analytics', exact: true, icon: BarChart3 },
+    { label: 'Customers', href: '/admin/customers', exact: true, icon: Users },
+    { label: 'Audit Log', href: '/admin/audit', exact: true, icon: ScrollText },
     { label: 'Website Settings', href: '/admin/settings', exact: true, icon: Settings },
   ];
 

@@ -3,6 +3,12 @@ import { TelegramWebhookUpdate, extractUrlsFromMessage } from '@/lib/telegram/se
 import { processTelegramQueue, runAfterResponse } from '@/lib/telegram/queue';
 import { safeEqual } from '@/lib/admin-session';
 import { db } from '@/lib/db';
+import { clientIp, createRateLimiter } from '@/lib/rate-limit';
+
+// Telegram delivers updates one at a time per bot, so normal traffic is far below this.
+// Unauthenticated callers are limited much harder to stop secret guessing.
+const perIpLimit = createRateLimiter({ limit: 120, windowMs: 60_000 });
+const failedAuthLimit = createRateLimiter({ limit: 10, windowMs: 15 * 60_000 });
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60; // background extraction may continue after the reply
@@ -13,6 +19,12 @@ export const maxDuration = 60; // background extraction may continue after the r
  * so Telegram never waits on slow retailer sites.
  */
 export async function POST(req: NextRequest) {
+  const ip = clientIp(req.headers);
+  const rate = perIpLimit(ip);
+  if (!rate.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(rate.retryAfterSeconds) } });
+  }
+
   try {
     // 1. Verify Telegram Webhook Secret Token (fail closed if not configured).
     const configuredSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
@@ -22,6 +34,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 });
     }
     if (!incomingSecret || !safeEqual(incomingSecret, configuredSecret)) {
+      const strikes = failedAuthLimit(ip);
+      if (!strikes.allowed) {
+        return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(strikes.retryAfterSeconds) } });
+      }
       console.warn('Unauthorized Telegram webhook attempt: secret token mismatch');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

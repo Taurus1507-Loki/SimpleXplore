@@ -1,3 +1,4 @@
+import { audit } from '@/lib/audit';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminApi } from '@/lib/auth';
 import { db, type CategoryInput } from '@/lib/db';
@@ -57,6 +58,7 @@ export async function POST(req: NextRequest) {
     const { input, error } = parseInput(await req.json(), false);
     if (error || !input) return NextResponse.json({ error }, { status: 400 });
     const category = await db.createCategory(input as CategoryInput);
+    await audit('category.create', 'category', category.id, { name: category.name });
     return NextResponse.json({ success: true, category });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 400 });
@@ -73,6 +75,7 @@ export async function PATCH(req: NextRequest) {
     if (error || !input) return NextResponse.json({ error }, { status: 400 });
     const category = await db.updateCategory(raw.id, input);
     if (!category) return NextResponse.json({ error: 'Category not found.' }, { status: 404 });
+    await audit('category.update', 'category', category.id, { name: category.name, fields: Object.keys(input) });
     return NextResponse.json({ success: true, category });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 400 });
@@ -87,6 +90,7 @@ export async function DELETE(req: NextRequest) {
   try {
     const ok = await db.deleteCategory(id);
     if (!ok) return NextResponse.json({ error: 'Category not found.' }, { status: 404 });
+    await audit('category.delete', 'category', id);
     return NextResponse.json({ success: true });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });

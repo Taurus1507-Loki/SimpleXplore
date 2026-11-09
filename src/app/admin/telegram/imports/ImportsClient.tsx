@@ -320,7 +320,13 @@ export default function ImportsClient({ initialImports, statusFilter }: ImportsC
                       </p>
                     )}
 
-                    <div className="flex items-center gap-4 text-xs text-copy-muted pt-1">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-copy-muted pt-1">
+                      {item.extracted_data.channel_name && (
+                        <span>
+                          Channel: <span className="font-medium text-copy-secondary">{item.extracted_data.channel_name}</span>
+                        </span>
+                      )}
+                      {item.extracted_data.message_date && <span>Posted: {formatDate(item.extracted_data.message_date)}</span>}
                       <span>Imported: {formatDate(item.created_at)}</span>
                       <span>•</span>
                       <a

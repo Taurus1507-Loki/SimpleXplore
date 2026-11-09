@@ -1,4 +1,3 @@
-import { URL } from 'url';
 
 /**
  * Validates external URLs to prevent Server-Side Request Forgery (SSRF).

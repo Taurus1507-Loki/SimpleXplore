@@ -1,3 +1,4 @@
+import { audit } from '@/lib/audit';
 import { requireAdminApi } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -33,6 +34,7 @@ export async function POST(req: NextRequest) {
     const data = await response.json();
 
     if (data.ok) {
+      await audit('telegram.register_webhook', 'settings', null, { url: webhookUrl });
       return NextResponse.json({
         success: true,
         message: `Telegram Webhook registered successfully for ${webhookUrl}!`,

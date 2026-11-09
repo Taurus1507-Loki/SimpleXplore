@@ -7,6 +7,7 @@ import {
 } from '@/lib/admin-session';
 import { isSupabaseConfigured } from '@/lib/supabase/config';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { db } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +49,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Demo mode: no real user store, but the signed session keeps each shopper's wishlist separate.
+  await db.recordDemoCustomer(email, fullName);
   const res = NextResponse.json({ success: true, needsConfirmation: false, redirect: '/products' });
   res.cookies.set(CUSTOMER_SESSION_COOKIE, await createCustomerSessionToken(email), {
     httpOnly: true,
