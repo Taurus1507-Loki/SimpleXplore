@@ -34,3 +34,4 @@ describe('Affiliate Redirect Gateway and Click Tracking', () => {
     expect(isSafeExternalUrl(localHostDestination).isSafe).toBe(false);
   });
 });
+

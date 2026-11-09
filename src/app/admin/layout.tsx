@@ -2,6 +2,7 @@ import React from 'react';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import AdminSidebar from '@/components/admin/AdminSidebar';
+import AdminHeaderActions from '@/components/admin/AdminHeaderActions';
 import { ShieldCheck } from 'lucide-react';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { isUserAdmin } from '@/lib/auth';
@@ -65,6 +66,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               Role: Master Admin
             </span>
             <span className="text-copy-muted hidden sm:inline">simplore01@gmail.com</span>
+            <div className="h-4 w-[1px] bg-surface-border hidden sm:block" />
+            <AdminHeaderActions />
           </div>
         </header>
 

@@ -30,11 +30,6 @@ export default function Header() {
   const pathname = usePathname();
   const { wishlistCount } = useWishlist();
 
-  // Hide public customer header completely on admin pages
-  if (pathname.startsWith('/admin')) {
-    return null;
-  }
-
   useEffect(() => {
     // Check authentication state
     const checkAuth = async () => {
@@ -72,6 +67,11 @@ export default function Header() {
 
     checkAuth();
   }, [pathname]);
+
+  // Hide public customer header completely on admin pages (AFTER all hooks)
+  if (pathname.startsWith('/admin')) {
+    return null;
+  }
 
   const handleSignOut = async () => {
     if (typeof document !== 'undefined') {

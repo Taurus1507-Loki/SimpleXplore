@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { 
   LayoutDashboard, 
   Package, 
@@ -16,11 +16,27 @@ import {
   ExternalLink,
   ShieldCheck,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  LogOut
 } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleAdminSignOut = async () => {
+    if (typeof document !== 'undefined') {
+      document.cookie = 'sx_admin_demo=; path=/; max-age=0';
+      document.cookie = 'sx_user_email=; path=/; max-age=0';
+    }
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+    } catch {}
+    router.push('/login');
+    router.refresh();
+  };
 
   const navItems = [
     { label: 'Overview', href: '/admin', icon: LayoutDashboard },
@@ -95,24 +111,27 @@ export default function AdminSidebar() {
         </nav>
       </div>
 
-      {/* Footer link to public site */}
-      <div className="p-4 border-t border-[#243324] space-y-3">
-        <div className="p-3 bg-[#1C261C] rounded-xl border border-[#2B3B2B] text-[11px] text-[#A6B8A6]">
-          <div className="flex items-center gap-1.5 font-bold text-white mb-1">
-            <CheckCircle2 className="w-3.5 h-3.5 text-brand-400" />
-            <span>Draft Protection Active</span>
-          </div>
-          Telegram imports require admin approval before going public.
-        </div>
-
+      {/* Footer link to public site & Logout */}
+      <div className="p-4 border-t border-[#243324] space-y-2">
         <Link
           href="/"
           target="_blank"
           className="flex items-center justify-between px-3 py-2 text-xs text-[#A8B8A8] hover:text-white hover:bg-[#202C20] rounded-xl transition-colors"
         >
-          <span>View Public Website</span>
+          <span>View Public Storefront</span>
           <ExternalLink className="w-3.5 h-3.5" />
         </Link>
+
+        <button
+          type="button"
+          onClick={handleAdminSignOut}
+          className="w-full flex items-center justify-between px-3 py-2 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded-xl transition-colors font-semibold"
+        >
+          <div className="flex items-center gap-2">
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Sign Out Admin</span>
+          </div>
+        </button>
       </div>
     </aside>
   );
