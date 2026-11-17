@@ -5,6 +5,8 @@ import { db } from '@/lib/db';
 import Hero from '@/components/Hero';
 import CategoryBar from '@/components/CategoryBar';
 import ProductGrid from '@/components/ProductGrid';
+import ProductCatalogClient from '@/components/ProductCatalogClient';
+import PageHeader from '@/components/PageHeader';
 import SectionHeader from '@/components/SectionHeader';
 import { Reveal } from '@/components/motion/Reveal';
 import { Product } from '@/types';
@@ -56,21 +58,34 @@ function ProductSection({
 }
 
 export default async function HomePage() {
-  const [settings, categories, featuredData, trendingData, dealsData, recentData] = await Promise.all([
+  const [settings, categories, featuredData, trendingData, dealsData, allPublished] = await Promise.all([
     db.getSettings(),
     db.getCategories(),
     db.getProducts({ status: 'published', isFeatured: true, limit: 4 }),
     db.getProducts({ status: 'published', isTrending: true, limit: 4 }),
     db.getProducts({ status: 'published', isDeals: true, sort: 'discount', limit: 4 }),
-    db.getProducts({ status: 'published', sort: 'newest', limit: 8 }),
+    db.getProducts({ status: 'published' }),
   ]);
   const cfg = settings.homepage_config;
-
-  const showcase = featuredData.products.length >= 3 ? featuredData.products : recentData.products;
+  const recentProducts = allPublished.products.slice(0, 8);
+  const showcase = featuredData.products.length >= 3 ? featuredData.products : recentProducts;
 
   return (
-    <div className="space-y-14 pb-20 sm:space-y-20">
-      {cfg.show_hero !== false && <Hero showcase={showcase} />}
+    <>
+      {/* Mobile: show Home > Products catalog directly */}
+      <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 md:hidden">
+        <PageHeader
+          crumbs={[{ name: 'Products', path: '/products' }]}
+          eyebrow="Catalog"
+          title="All products"
+          description="Handpicked products from India's leading online stores. Filter by category, retailer, price or discount."
+        />
+        <ProductCatalogClient initialProducts={allPublished.products} categories={categories} />
+      </div>
+
+      {/* Desktop: full curated homepage */}
+      <div className="hidden space-y-14 pb-20 sm:space-y-20 md:block">
+        {cfg.show_hero !== false && <Hero showcase={showcase} />}
 
       {cfg.show_categories !== false && <CategoryBar categories={categories} />}
 
@@ -116,7 +131,7 @@ export default async function HomePage() {
         description="Fresh finds, newest first."
         href="/products"
         linkLabel="Browse everything"
-        products={recentData.products}
+        products={recentProducts}
       />
 
       {/* Trust strip: describes how the site works, makes no performance claims. */}
@@ -154,5 +169,6 @@ export default async function HomePage() {
         </Reveal>
       </section>
     </div>
+    </>
   );
 }
