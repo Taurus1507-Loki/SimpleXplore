@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { TelegramImport, Category, Product } from '@/types';
 import { formatPrice } from '@/lib/utils/formatters';
+import { isOpenableHttpUrl } from '@/lib/utils/clipboard-image';
 import { 
   CheckCircle2, 
   XCircle, 
@@ -378,12 +379,26 @@ export default function ReviewClient({ initialImport, categories }: ReviewClient
 
               <div>
                 <label className="block font-semibold text-copy-primary mb-1">Affiliate Destination URL</label>
-                <input
-                  type="url"
-                  value={affiliateUrl}
-                  onChange={(e) => setAffiliateUrl(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-surface-border focus:outline-none focus:border-brand-500 font-mono text-xs"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={affiliateUrl}
+                    onChange={(e) => setAffiliateUrl(e.target.value)}
+                    className="flex-1 min-w-0 px-3.5 py-2.5 rounded-xl border border-surface-border focus:outline-none focus:border-brand-500 font-mono text-xs"
+                  />
+                  {isOpenableHttpUrl(affiliateUrl) && (
+                    <a
+                      href={affiliateUrl.trim()}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Open affiliate link in a new tab"
+                      className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-surface-border bg-white hover:border-brand-300 hover:bg-brand-50 text-xs font-semibold text-brand-700 shrink-0 transition-colors"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+                      <span>Open</span>
+                    </a>
+                  )}
+                </div>
               </div>
 
               <div>

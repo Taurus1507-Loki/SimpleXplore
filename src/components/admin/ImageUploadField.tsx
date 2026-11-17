@@ -2,7 +2,12 @@
 
 import React, { useId, useRef, useState } from 'react';
 import Image from '@/components/SafeImage';
-import { ImagePlus, Loader2, Link2, X } from 'lucide-react';
+import { ImagePlus, Loader2, Link2, ClipboardPaste, X } from 'lucide-react';
+import {
+  extractImageFilesFromClipboard,
+  readImagesFromNavigatorClipboard,
+  uploadAdminImage,
+} from '@/lib/utils/clipboard-image';
 
 interface ImageUploadFieldProps {
   label: string;
@@ -26,19 +31,10 @@ export default function ImageUploadField({ label, value, onChange, folder = 'pro
 
   async function upload(file: File) {
     setError(null);
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image is too large. The maximum is 5 MB.');
-      return;
-    }
     setUploading(true);
     try {
-      const form = new FormData();
-      form.append('file', file);
-      form.append('folder', folder);
-      const res = await fetch('/api/admin/upload', { method: 'POST', body: form });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.url) throw new Error(data.error || 'Upload failed.');
-      onChange(data.url);
+      const url = await uploadAdminImage(file, folder);
+      onChange(url);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Upload failed.');
     } finally {
@@ -47,8 +43,33 @@ export default function ImageUploadField({ label, value, onChange, folder = 'pro
     }
   }
 
+  function handlePaste(e: React.ClipboardEvent) {
+    const images = extractImageFilesFromClipboard(e.clipboardData);
+    if (images.length === 0) return;
+    e.preventDefault();
+    void upload(images[0]);
+  }
+
+  async function handlePasteClick() {
+    setError(null);
+    try {
+      const images = await readImagesFromNavigatorClipboard();
+      if (images.length === 0) {
+        setError('No image found in clipboard. Take a screenshot first, then paste.');
+        return;
+      }
+      await upload(images[0]);
+    } catch (e) {
+      setError(
+        e instanceof Error && e.message.includes('Ctrl+V')
+          ? e.message
+          : 'Press Ctrl+V (or Cmd+V) in this box to paste your screenshot.'
+      );
+    }
+  }
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" onPaste={handlePaste}>
       <label htmlFor={inputId} className="block text-xs font-semibold text-copy-primary">
         {label}
         {required && <span className="text-red-600"> *</span>}
@@ -91,15 +112,26 @@ export default function ImageUploadField({ label, value, onChange, folder = 'pro
         </div>
 
         <div className="min-w-0 flex-1 space-y-2">
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
-            disabled={uploading}
-            className="inline-flex min-h-[40px] items-center gap-2 rounded-xl border border-surface-border bg-white px-3 text-xs font-semibold text-copy-primary hover:border-brand-300 hover:bg-brand-50 disabled:opacity-60"
-          >
-            <ImagePlus className="h-4 w-4" aria-hidden="true" />
-            {uploading ? 'Uploading…' : value ? 'Replace image' : 'Upload from computer'}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="inline-flex min-h-[40px] items-center gap-2 rounded-xl border border-surface-border bg-white px-3 text-xs font-semibold text-copy-primary hover:border-brand-300 hover:bg-brand-50 disabled:opacity-60"
+            >
+              <ImagePlus className="h-4 w-4" aria-hidden="true" />
+              {uploading ? 'Uploading…' : value ? 'Replace image' : 'Upload from computer'}
+            </button>
+            <button
+              type="button"
+              onClick={handlePasteClick}
+              disabled={uploading}
+              className="inline-flex min-h-[40px] items-center gap-2 rounded-xl border border-surface-border bg-white px-3 text-xs font-semibold text-copy-primary hover:border-brand-300 hover:bg-brand-50 disabled:opacity-60"
+            >
+              <ClipboardPaste className="h-4 w-4" aria-hidden="true" />
+              Paste screenshot
+            </button>
+          </div>
           <input
             ref={fileRef}
             type="file"
@@ -132,7 +164,9 @@ export default function ImageUploadField({ label, value, onChange, folder = 'pro
           {error}
         </p>
       ) : (
-        <p className="text-[11px] text-copy-muted">{hint ?? 'JPG, PNG, WebP, GIF or AVIF · max 5 MB · drag and drop works too'}</p>
+        <p className="text-[11px] text-copy-muted">
+          {hint ?? 'JPG, PNG, WebP, GIF or AVIF · max 5 MB · drag & drop or Ctrl+V screenshot works too'}
+        </p>
       )}
     </div>
   );

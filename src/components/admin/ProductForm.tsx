@@ -5,7 +5,13 @@ import { useRouter } from 'next/navigation';
 import Image from '@/components/SafeImage';
 import { Product, Category, ProductAvailability } from '@/types';
 import { formatPrice } from '@/lib/utils/formatters';
-import { Save, Globe, Eye, CheckCircle2, AlertCircle, UploadCloud, Plus, Trash2, Star, Image as ImageIcon } from 'lucide-react';
+import { Save, Globe, Eye, CheckCircle2, AlertCircle, UploadCloud, Plus, Trash2, Star, Image as ImageIcon, ExternalLink, ClipboardPaste } from 'lucide-react';
+import {
+  extractImageFilesFromClipboard,
+  isOpenableHttpUrl,
+  readImagesFromNavigatorClipboard,
+  uploadAdminImage,
+} from '@/lib/utils/clipboard-image';
 
 interface ProductFormProps {
   initialProduct?: Product;
@@ -84,24 +90,14 @@ export default function ProductForm({ initialProduct, categories, prefill, sourc
   const [uploading, setUploading] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  /** Uploads to /api/admin/upload (Supabase Storage in live mode) and stores the returned URL. */
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    e.target.value = '';
+  async function uploadFiles(files: File[]) {
     if (files.length === 0) return;
     setUploadError(null);
     setUploading((n) => n + files.length);
 
     for (const file of files) {
       try {
-        if (file.size > 5 * 1024 * 1024) throw new Error(`${file.name} is larger than 5 MB.`);
-        const form = new FormData();
-        form.append('file', file);
-        form.append('folder', 'products');
-        const res = await fetch('/api/admin/upload', { method: 'POST', body: form });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data.url) throw new Error(data.error || `Could not upload ${file.name}.`);
-        const url: string = data.url;
+        const url = await uploadAdminImage(file, 'products');
         setImageUrl((curr) => {
           if (!curr) return url;
           setAdditionalImages((prev) => (prev.includes(url) ? prev : [...prev, url]));
@@ -112,6 +108,38 @@ export default function ProductForm({ initialProduct, categories, prefill, sourc
       } finally {
         setUploading((n) => n - 1);
       }
+    }
+  }
+
+  /** Uploads to /api/admin/upload (Supabase Storage in live mode) and stores the returned URL. */
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = '';
+    await uploadFiles(files);
+  };
+
+  const handleImagePaste = (e: React.ClipboardEvent) => {
+    const images = extractImageFilesFromClipboard(e.clipboardData);
+    if (images.length === 0) return;
+    e.preventDefault();
+    void uploadFiles(images);
+  };
+
+  const handlePasteScreenshotClick = async () => {
+    setUploadError(null);
+    try {
+      const images = await readImagesFromNavigatorClipboard();
+      if (images.length === 0) {
+        setUploadError('No image found in clipboard. Take a screenshot first, then paste.');
+        return;
+      }
+      await uploadFiles(images);
+    } catch (err) {
+      setUploadError(
+        err instanceof Error && err.message.includes('Ctrl+V')
+          ? err.message
+          : 'Press Ctrl+V (or Cmd+V) anywhere in the images section to paste your screenshot.'
+      );
     }
   };
 
@@ -358,26 +386,40 @@ export default function ProductForm({ initialProduct, categories, prefill, sourc
 
               <div>
                 <label className="block font-semibold text-copy-primary mb-1">Affiliate Destination URL *</label>
-                <input
-                  type="url"
-                  required
-                  value={affiliateUrl}
-                  onChange={(e) => setAffiliateUrl(e.target.value)}
-                  placeholder="https://www.amazon.in/dp/...?tag=yourtag"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-surface-border focus:outline-none focus:border-brand-500 font-mono text-xs"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    required
+                    value={affiliateUrl}
+                    onChange={(e) => setAffiliateUrl(e.target.value)}
+                    placeholder="https://www.amazon.in/dp/...?tag=yourtag"
+                    className="flex-1 min-w-0 px-3.5 py-2.5 rounded-xl border border-surface-border focus:outline-none focus:border-brand-500 font-mono text-xs"
+                  />
+                  {isOpenableHttpUrl(affiliateUrl) && (
+                    <a
+                      href={affiliateUrl.trim()}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Open affiliate link in a new tab"
+                      className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-surface-border bg-white hover:border-brand-300 hover:bg-brand-50 text-xs font-semibold text-brand-700 shrink-0 transition-colors"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+                      <span>Open</span>
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
 
             {/* Multi-Image Upload & Management */}
-            <div className="space-y-3 pt-1">
+            <div className="space-y-3 pt-1" onPaste={handleImagePaste}>
               <div className="flex items-center justify-between">
                 <div>
                   <label className="block font-semibold text-copy-primary">
                     Product Showcase Images
                   </label>
                   <p className="text-[11px] text-copy-secondary">
-                    Add multiple photos from your device or online URLs. The primary photo is displayed on store cards.
+                    Upload from your device, paste a screenshot (Ctrl+V), or add online URLs. The primary photo is displayed on store cards.
                   </p>
                 </div>
                 <span className="text-xs font-bold text-brand-700 bg-brand-50 px-2.5 py-1 rounded-full border border-brand-200">
@@ -387,22 +429,33 @@ export default function ProductForm({ initialProduct, categories, prefill, sourc
 
               {/* Upload & Add URL controls */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-surface-bg rounded-2xl border border-surface-border">
-                {/* File Upload Button */}
+                {/* File Upload & Screenshot Paste */}
                 <div>
                   <label className="block text-[11px] font-bold text-copy-primary uppercase mb-1">
-                    Upload from Computer
+                    Upload or Paste Screenshot
                   </label>
-                  <label className="flex items-center justify-center gap-2 px-3 py-2 bg-white hover:bg-brand-50 border border-dashed border-brand-300 hover:border-brand-500 rounded-xl cursor-pointer text-xs font-semibold text-brand-700 transition-colors shadow-soft-sm">
-                    <UploadCloud className="w-4 h-4 text-brand-600" />
-                    <span>{uploading > 0 ? `Uploading ${uploading}…` : 'Choose Multiple Images'}</span>
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <label className="flex-1 min-w-[140px] flex items-center justify-center gap-2 px-3 py-2 bg-white hover:bg-brand-50 border border-dashed border-brand-300 hover:border-brand-500 rounded-xl cursor-pointer text-xs font-semibold text-brand-700 transition-colors shadow-soft-sm">
+                      <UploadCloud className="w-4 h-4 text-brand-600" />
+                      <span>{uploading > 0 ? `Uploading ${uploading}…` : 'Choose Images'}</span>
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handlePasteScreenshotClick}
+                      disabled={uploading > 0}
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white hover:bg-brand-50 border border-surface-border hover:border-brand-300 rounded-xl text-xs font-semibold text-copy-primary transition-colors shadow-soft-sm disabled:opacity-60"
+                    >
+                      <ClipboardPaste className="w-4 h-4 text-brand-600" aria-hidden="true" />
+                      <span>Paste Screenshot</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Direct Image URL input */}
