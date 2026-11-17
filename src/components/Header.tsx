@@ -8,10 +8,13 @@ import { Search, Heart, Menu, X, User, LogOut, ShieldCheck, ChevronDown } from '
 import { useWishlist } from './WishlistContext';
 import { createClient } from '@/lib/supabase/client';
 import Logo from './Logo';
+import { getSocialItems } from './SocialLinks';
+import type { WebsiteSettings } from '@/types';
 
 interface HeaderProps {
   initialEmail: string | null;
   initialIsAdmin: boolean;
+  socialLinks?: WebsiteSettings['social_links'];
 }
 
 const NAV = [
@@ -78,7 +81,7 @@ function SearchForm({ id, onSubmitted }: { id: string; onSubmitted?: () => void 
   );
 }
 
-export default function Header({ initialEmail, initialIsAdmin }: HeaderProps) {
+export default function Header({ initialEmail, initialIsAdmin, socialLinks }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(initialEmail);
@@ -124,6 +127,16 @@ export default function Header({ initialEmail, initialIsAdmin }: HeaderProps) {
       document.removeEventListener('mousedown', onClick);
     };
   }, [userMenuOpen, mobileMenuOpen]);
+
+  // Lock background scroll while the mobile right-side drawer is open.
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileMenuOpen]);
 
   // Customer chrome is hidden on admin and auth screens.
   if (pathname.startsWith('/admin') || pathname === '/login' || pathname === '/register') {
@@ -315,61 +328,115 @@ export default function Header({ initialEmail, initialIsAdmin }: HeaderProps) {
         </div>
       </nav>
 
-      <AnimatePresence initial={false}>
+      <AnimatePresence>
         {mobileMenuOpen && (
-          <motion.nav
-            id="mobile-menu"
-            aria-label="Mobile"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-            className="overflow-hidden border-t border-surface-border bg-white md:hidden"
-          >
-            <ul className="grid grid-cols-2 gap-1 p-3">
-              {[...NAV, { label: 'Wishlist', href: '/wishlist', exact: true }].map((item) => {
-                const active = isActive(pathname, item.href, item.exact);
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      aria-current={active ? 'page' : undefined}
-                      className={`flex min-h-[44px] items-center rounded-xl px-3 text-sm ${
-                        active ? 'bg-brand-50 font-semibold text-brand-800' : 'text-copy-primary hover:bg-surface-muted'
-                      }`}
-                    >
-                      {item.label}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-            <div className="flex gap-2 border-t border-surface-border p-3">
-              {isAdmin ? (
-                <Link
-                  href="/admin"
-                  className="flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl bg-ink text-sm font-semibold text-white"
+          <>
+            <motion.div
+              aria-hidden="true"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setMobileMenuOpen(false)}
+              className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-[1px] md:hidden"
+            />
+            <motion.nav
+              id="mobile-menu"
+              aria-label="Mobile"
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              className="fixed inset-y-0 right-0 z-50 flex w-[82%] max-w-xs flex-col bg-white shadow-2xl md:hidden"
+            >
+              <div className="flex items-center justify-between border-b border-surface-border px-4 py-3">
+                <span className="font-display text-sm font-bold text-ink">Menu</span>
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen(false)}
+                  aria-label="Close menu"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-surface-border text-copy-secondary hover:bg-surface-muted"
                 >
-                  <ShieldCheck className="h-4 w-4" aria-hidden="true" /> Admin dashboard
-                </Link>
-              ) : userEmail ? null : (
-                <>
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-3 space-y-4">
+                <ul className="space-y-1">
+                  {[...NAV, { label: 'Wishlist', href: '/wishlist', exact: true }].map((item) => {
+                    const active = isActive(pathname, item.href, item.exact);
+                    return (
+                      <li key={item.href}>
+                        <Link
+                          href={item.href}
+                          aria-current={active ? 'page' : undefined}
+                          className={`flex min-h-[44px] items-center rounded-xl px-3 text-sm ${
+                            active ? 'bg-brand-50 font-semibold text-brand-800' : 'text-copy-primary hover:bg-surface-muted'
+                          }`}
+                        >
+                          {item.label}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+
+                {(() => {
+                  const socials = getSocialItems(socialLinks);
+                  if (socials.length === 0) return null;
+                  return (
+                    <div className="border-t border-surface-border pt-4 px-1">
+                      <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-copy-muted">
+                        Follow us
+                      </p>
+                      <ul className="flex flex-wrap gap-2">
+                        {socials.map(({ href, label, Icon }) => (
+                          <li key={label}>
+                            <a
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label={label}
+                              title={label}
+                              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-surface-border bg-surface-muted text-copy-primary transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+                            >
+                              <Icon className="h-4 w-4" />
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div className="flex gap-2 border-t border-surface-border p-3">
+                {isAdmin ? (
                   <Link
-                    href="/login"
-                    className="flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl border border-surface-border text-sm font-semibold"
+                    href="/admin"
+                    className="flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl bg-ink text-sm font-semibold text-white"
                   >
-                    <User className="h-4 w-4" aria-hidden="true" /> Log in
+                    <ShieldCheck className="h-4 w-4" aria-hidden="true" /> Admin dashboard
                   </Link>
-                  <Link
-                    href="/register"
-                    className="flex min-h-[44px] flex-1 items-center justify-center rounded-xl bg-brand-600 text-sm font-semibold text-white"
-                  >
-                    Register
-                  </Link>
-                </>
-              )}
-            </div>
-          </motion.nav>
+                ) : userEmail ? null : (
+                  <>
+                    <Link
+                      href="/login"
+                      className="flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl border border-surface-border text-sm font-semibold"
+                    >
+                      <User className="h-4 w-4" aria-hidden="true" /> Log in
+                    </Link>
+                    <Link
+                      href="/register"
+                      className="flex min-h-[44px] flex-1 items-center justify-center rounded-xl bg-brand-600 text-sm font-semibold text-white"
+                    >
+                      Register
+                    </Link>
+                  </>
+                )}
+              </div>
+            </motion.nav>
+          </>
         )}
       </AnimatePresence>
     </header>

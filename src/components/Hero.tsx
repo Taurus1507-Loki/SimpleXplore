@@ -29,7 +29,7 @@ export default function Hero({ showcase }: HeroProps) {
   const tall = tiles.length === 3;
 
   return (
-    <section aria-labelledby="hero-title" className="relative overflow-hidden border-b border-surface-border bg-white">
+    <section aria-labelledby="hero-title" className="relative hidden overflow-hidden border-b border-surface-border bg-white md:block">
       {/* Quiet brand field — no glows, just a soft tinted plane behind the showcase. */}
       <div aria-hidden="true" className="absolute inset-y-0 right-0 hidden w-[44%] bg-brand-50 lg:block" />
 

@@ -116,7 +116,7 @@ export default async function RootLayout({
             affiliateDisclosure: settings.affiliate_disclosure,
           }}
         >
-          <Header initialEmail={initialEmail} initialIsAdmin={Boolean(adminSession)} />
+          <Header initialEmail={initialEmail} initialIsAdmin={Boolean(adminSession)} socialLinks={settings.social_links} />
           <main id="main-content" className="flex-1">
             {children}
           </main>
