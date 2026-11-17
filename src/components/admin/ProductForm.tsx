@@ -20,9 +20,11 @@ interface ProductFormProps {
   prefill?: Partial<Product>;
   /** When set, the created product is linked back to this Telegram import. */
   sourceImportId?: string;
+  /** Where to return after saving (preserves the active products tab). */
+  returnTo?: string;
 }
 
-export default function ProductForm({ initialProduct, categories, prefill, sourceImportId }: ProductFormProps) {
+export default function ProductForm({ initialProduct, categories, prefill, sourceImportId, returnTo }: ProductFormProps) {
   const router = useRouter();
   const seed: Partial<Product> | undefined = initialProduct ?? prefill;
 
@@ -34,7 +36,7 @@ export default function ProductForm({ initialProduct, categories, prefill, sourc
   const [currency, setCurrency] = useState(seed?.currency || 'INR');
   const [discount, setDiscount] = useState<number | undefined>(seed?.discount || undefined);
   const [retailer, setRetailer] = useState(seed?.retailer || 'Amazon India');
-  const [availability, setAvailability] = useState<ProductAvailability | ''>(seed?.availability ?? '');
+  const [availability, setAvailability] = useState<ProductAvailability>(seed?.availability ?? 'in_stock');
   const [categoryId, setCategoryId] = useState(seed?.category_id || categories[0]?.id || '');
   const [imageUrl, setImageUrl] = useState(seed?.image_url || '');
   const [additionalImages, setAdditionalImages] = useState<string[]>(
@@ -195,7 +197,7 @@ export default function ProductForm({ initialProduct, categories, prefill, sourc
       currency,
       discount,
       retailer,
-      availability: availability || null,
+      availability,
       category_id: categoryId,
       image_url: imageUrl.trim(),
       images: allImagesFormatted,
@@ -228,7 +230,7 @@ export default function ProductForm({ initialProduct, categories, prefill, sourc
           type: 'success',
           message: `Product successfully ${submitStatus === 'published' ? 'published to store!' : 'saved as draft.'}`,
         });
-        setTimeout(() => router.push('/admin/products'), 1500);
+        setTimeout(() => router.push(returnTo || '/admin/products'), 1500);
       } else {
         setFeedback({ type: 'error', message: data.error || 'Failed to save product.' });
       }
@@ -374,10 +376,9 @@ export default function ProductForm({ initialProduct, categories, prefill, sourc
                 <select
                   id="pf-availability"
                   value={availability}
-                  onChange={(e) => setAvailability(e.target.value as ProductAvailability | '')}
+                  onChange={(e) => setAvailability(e.target.value as ProductAvailability)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-surface-border focus:outline-none focus:border-brand-500 bg-white"
                 >
-                  <option value="">Unknown (not shown)</option>
                   <option value="in_stock">In stock</option>
                   <option value="limited">Limited stock</option>
                   <option value="out_of_stock">Out of stock</option>

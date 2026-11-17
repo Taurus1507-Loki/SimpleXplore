@@ -9,12 +9,19 @@ interface EditProductPageProps {
   params: Promise<{
     id: string;
   }>;
+  searchParams: Promise<{
+    status?: string;
+  }>;
 }
 
 export const revalidate = 0;
 
 export default async function EditProductPage(props: EditProductPageProps) {
-  const params = await props.params;
+  const [params, searchParams] = await Promise.all([props.params, props.searchParams]);
+  const returnTo =
+    searchParams.status === 'published' || searchParams.status === 'draft'
+      ? `/admin/products?status=${searchParams.status}`
+      : '/admin/products';
   const [product, categories] = await Promise.all([
     db.getProductById(params.id),
     db.getCategories(),
@@ -28,7 +35,7 @@ export default async function EditProductPage(props: EditProductPageProps) {
     <div className="space-y-6 max-w-6xl">
       <div className="flex items-center gap-3">
         <Link
-          href="/admin/products"
+          href={returnTo}
           className="p-2 rounded-xl bg-white border border-surface-border text-copy-secondary hover:text-copy-primary hover:bg-surface-bg transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -44,7 +51,7 @@ export default async function EditProductPage(props: EditProductPageProps) {
         </div>
       </div>
 
-      <ProductForm initialProduct={product} categories={categories} />
+      <ProductForm initialProduct={product} categories={categories} returnTo={returnTo} />
     </div>
   );
 }

@@ -8,8 +8,18 @@ import { Edit, Trash2, Globe, EyeOff, Copy, Eye } from 'lucide-react';
 
 const btn = 'flex h-8 w-8 items-center justify-center rounded-lg border transition-colors disabled:opacity-50';
 
-export default function ProductTableActions({ product }: { product: Product }) {
+export default function ProductTableActions({
+  product,
+  currentStatus = 'all',
+}: {
+  product: Product;
+  currentStatus?: 'all' | 'published' | 'draft' | 'archived';
+}) {
   const router = useRouter();
+  const editHref =
+    currentStatus === 'published' || currentStatus === 'draft'
+      ? `/admin/products/${product.id}/edit?status=${currentStatus}`
+      : `/admin/products/${product.id}/edit`;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -86,7 +96,7 @@ export default function ProductTableActions({ product }: { product: Product }) {
         </a>
 
         <Link
-          href={`/admin/products/${product.id}/edit`}
+          href={editHref}
           aria-label={`Edit ${product.title}`}
           title="Edit product"
           className={`${btn} border-surface-border text-copy-secondary hover:bg-surface-bg hover:text-copy-primary`}

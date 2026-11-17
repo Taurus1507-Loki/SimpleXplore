@@ -3,6 +3,7 @@ import Link from 'next/link';
 import Image from '@/components/SafeImage';
 import { db } from '@/lib/db';
 import { formatPrice } from '@/lib/utils/formatters';
+import { isOpenableHttpUrl } from '@/lib/utils/clipboard-image';
 import { PlusCircle, Edit, Trash2, ExternalLink, Sparkles, TrendingUp, Package } from 'lucide-react';
 import ProductTableActions from './ProductTableActions';
 
@@ -20,10 +21,12 @@ export default async function AdminProductsPage(props: AdminProductsPageProps) {
   const statusFilter = (searchParams.status || 'all') as 'all' | 'published' | 'draft' | 'archived';
   const search = searchParams.search;
 
-  const { products, total } = await db.getProducts({
-    status: statusFilter,
-    search,
-  });
+  const [{ products, total }, allCounts, publishedCounts, draftCounts] = await Promise.all([
+    db.getProducts({ status: statusFilter, search }),
+    db.getProducts({ status: 'all', search, limit: 1 }),
+    db.getProducts({ status: 'published', search, limit: 1 }),
+    db.getProducts({ status: 'draft', search, limit: 1 }),
+  ]);
 
   return (
     <div className="space-y-6 max-w-7xl">
@@ -58,7 +61,7 @@ export default async function AdminProductsPage(props: AdminProductsPageProps) {
             statusFilter === 'all' ? 'bg-copy-primary text-white' : 'text-copy-secondary hover:bg-surface-bg'
           }`}
         >
-          All Products ({total})
+          All Products ({allCounts.total})
         </Link>
         <Link
           href="/admin/products?status=published"
@@ -66,7 +69,7 @@ export default async function AdminProductsPage(props: AdminProductsPageProps) {
             statusFilter === 'published' ? 'bg-brand-500 text-white' : 'text-copy-secondary hover:bg-surface-bg'
           }`}
         >
-          Published Only
+          Published Only ({publishedCounts.total})
         </Link>
         <Link
           href="/admin/products?status=draft"
@@ -74,7 +77,7 @@ export default async function AdminProductsPage(props: AdminProductsPageProps) {
             statusFilter === 'draft' ? 'bg-amber-500 text-white' : 'text-copy-secondary hover:bg-surface-bg'
           }`}
         >
-          Drafts Only
+          Drafts Only ({draftCounts.total})
         </Link>
       </div>
 
@@ -113,10 +116,22 @@ export default async function AdminProductsPage(props: AdminProductsPageProps) {
                             className="object-contain"
                           />
                         </div>
-                        <div className="space-y-0.5 max-w-sm">
-                          <div className="font-bold text-copy-primary truncate">
-                            {p.title}
-                          </div>
+                        <div className="space-y-0.5 max-w-[12rem] min-w-0">
+                          {isOpenableHttpUrl(p.affiliate_url) ? (
+                            <a
+                              href={p.affiliate_url.trim()}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={p.title}
+                              className="block font-bold text-copy-primary hover:text-brand-700 hover:underline truncate"
+                            >
+                              {p.title}
+                            </a>
+                          ) : (
+                            <div title={p.title} className="font-bold text-copy-primary truncate">
+                              {p.title}
+                            </div>
+                          )}
                           <div className="text-[11px] text-copy-muted flex items-center gap-2">
                             <span>{p.category?.name || 'General'}</span>
                             {p.featured && (
@@ -159,7 +174,7 @@ export default async function AdminProductsPage(props: AdminProductsPageProps) {
                     </td>
 
                     <td className="py-3 px-4 text-right">
-                      <ProductTableActions product={p} />
+                      <ProductTableActions product={p} currentStatus={statusFilter} />
                     </td>
                   </tr>
                 ))}
