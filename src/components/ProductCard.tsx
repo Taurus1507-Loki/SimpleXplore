@@ -31,7 +31,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
       className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-surface-border bg-white transition-[border-color,box-shadow] duration-300 hover:border-brand-200 hover:shadow-card-hover"
     >
       {/* Image */}
-      <Link href={href} className="relative block aspect-square overflow-hidden bg-surface-muted/60" tabIndex={-1} aria-hidden="true">
+      <div className="relative block aspect-square overflow-hidden bg-surface-muted/60" aria-hidden="true">
         {product.image_url ? (
           <Image
             src={product.image_url}
@@ -47,7 +47,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
             <span className="text-[11px]">No image</span>
           </span>
         )}
-      </Link>
+      </div>
 
       {/* Badges */}
       <div className="pointer-events-none absolute left-2.5 top-2.5 flex flex-col items-start gap-1 sm:left-3 sm:top-3">
@@ -114,7 +114,20 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
         </div>
 
         <h3 className="line-clamp-2 text-[0.8125rem] font-semibold leading-snug text-ink sm:text-sm">
-          <Link href={href} className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-none group-focus-within:underline">
+          {/* Mobile: tapping anywhere on the card opens the affiliate site directly */}
+          <a
+            href={`/r/${product.id}`}
+            target="_blank"
+            rel="nofollow sponsored noopener"
+            className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-none group-focus-within:underline md:hidden"
+          >
+            {product.title}
+          </a>
+          {/* Desktop: tapping the card opens the product detail page */}
+          <Link
+            href={href}
+            className="hidden after:absolute after:inset-0 after:content-[''] focus-visible:outline-none group-focus-within:underline md:inline"
+          >
             {product.title}
           </Link>
         </h3>
