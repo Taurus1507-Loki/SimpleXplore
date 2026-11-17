@@ -108,10 +108,11 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
 
       {/* Body */}
       <div className="flex flex-1 flex-col gap-2 p-3 sm:p-4">
-        <div className="flex items-center justify-between gap-2 text-[11px] text-copy-muted">
-          <span className="truncate font-semibold uppercase tracking-wide text-copy-secondary">{product.retailer}</span>
-          {product.category && <span className="hidden truncate sm:inline">{product.category.name}</span>}
-        </div>
+        {product.category && (
+          <div className="hidden text-[11px] text-copy-muted sm:block">
+            <span className="truncate">{product.category.name}</span>
+          </div>
+        )}
 
         <h3 className="line-clamp-2 text-[0.8125rem] font-semibold leading-snug text-ink sm:text-sm">
           {/* Mobile: tapping anywhere on the card opens the affiliate site directly */}
@@ -158,7 +159,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
                 )}
               </p>
             ) : (
-              <p className="text-xs font-medium text-copy-secondary">Check price at {product.retailer}</p>
+              <p className="text-xs font-medium text-copy-secondary">Check current price</p>
             )}
             {lowest === 'above' && (
               <p className="tabular mt-0.5 text-[11px] text-copy-muted">
@@ -167,16 +168,16 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
             )}
           </div>
 
-          {/* Direct-to-retailer shortcut; sits above the stretched card link. */}
+          {/* Direct-to-retailer shortcut (desktop only; mobile taps anywhere on the card). */}
           <a
             href={`/r/${product.id}`}
             target="_blank"
             rel="nofollow sponsored noopener"
             aria-label={`Buy ${product.title} on ${product.retailer} (opens in new tab)`}
-            className="relative z-10 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white shadow-soft-sm transition-colors hover:bg-brand-700 active:scale-95 sm:w-auto sm:gap-1.5 sm:px-3"
+            className="relative z-10 hidden h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-brand-600 px-3 text-white shadow-soft-sm transition-colors hover:bg-brand-700 active:scale-95 md:inline-flex"
           >
-            <span className="hidden text-xs font-semibold sm:inline">Buy</span>
-            <ExternalLink className="h-4 w-4 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
+            <span className="text-xs font-semibold">Buy</span>
+            <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
           </a>
         </div>
       </div>
