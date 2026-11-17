@@ -55,3 +55,17 @@ export function truncateText(text: string, maxLength: number): string {
   return text.slice(0, maxLength) + '...';
 }
 
+
+/**
+ * Lowest-ever ("best") price display state.
+ *  - 'lowest'  → today's price is at (or below) the best price ever seen: show the "Lowest price ever" badge
+ *  - 'above'   → show "Lowest: ₹X" for reference
+ *  - null      → unknown best price or no current price: show nothing
+ */
+export function lowestPriceState(
+  currentPrice: number,
+  bestPrice?: number | null
+): 'lowest' | 'above' | null {
+  if (!(currentPrice > 0) || !bestPrice || !(bestPrice > 0)) return null;
+  return currentPrice <= bestPrice ? 'lowest' : 'above';
+}

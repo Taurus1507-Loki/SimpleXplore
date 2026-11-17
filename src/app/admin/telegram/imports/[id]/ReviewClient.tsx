@@ -35,6 +35,7 @@ export default function ReviewClient({ initialImport, categories }: ReviewClient
   const [title, setTitle] = useState(ext.title || live?.title || '');
   const [price, setPrice] = useState<number>(ext.price || live?.current_price || 0);
   const [originalPrice, setOriginalPrice] = useState<number | undefined>(ext.original_price ?? live?.original_price ?? undefined);
+  const [bestPrice, setBestPrice] = useState<number | undefined>(ext.best_price ?? live?.best_price ?? undefined);
   const [discount, setDiscount] = useState<number | undefined>(ext.discount ?? live?.discount ?? undefined);
   const [retailer, setRetailer] = useState(ext.retailer || live?.retailer || '');
   const [imageUrl, setImageUrl] = useState(ext.image_url || live?.image_url || '');
@@ -78,6 +79,7 @@ export default function ReviewClient({ initialImport, categories }: ReviewClient
             title,
             current_price: price,
             original_price: originalPrice,
+            best_price: bestPrice && bestPrice > 0 ? bestPrice : null,
             discount,
             retailer,
             image_url: imageUrl,
@@ -293,7 +295,7 @@ export default function ReviewClient({ initialImport, categories }: ReviewClient
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
                 <div>
                   <label className="block font-semibold text-copy-primary mb-1">Current Price (₹)</label>
                   <input
@@ -301,6 +303,17 @@ export default function ReviewClient({ initialImport, categories }: ReviewClient
                     value={price}
                     onChange={(e) => handlePriceChange(parseFloat(e.target.value) || 0)}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-surface-border focus:outline-none focus:border-brand-500 font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-copy-primary mb-1">Best Price (₹, lowest ever)</label>
+                  <input
+                    type="number"
+                    value={bestPrice || ''}
+                    onChange={(e) => setBestPrice(parseFloat(e.target.value) || undefined)}
+                    placeholder="Lowest ever"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-surface-border focus:outline-none focus:border-brand-500"
                   />
                 </div>
 

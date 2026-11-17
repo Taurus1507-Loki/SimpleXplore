@@ -272,10 +272,29 @@ function galleryUrls(images: unknown): string[] {
 /** Columns of `public.products` that callers may write. Anything else is dropped. */
 const PRODUCT_WRITABLE_COLUMNS = [
   'title', 'slug', 'description', 'highlights', 'category_id', 'retailer',
-  'current_price', 'original_price', 'currency', 'discount', 'rating', 'review_count',
+  'current_price', 'original_price', 'best_price', 'currency', 'discount', 'rating', 'review_count',
   'image_url', 'affiliate_url', 'featured', 'trending', 'status', 'source_type',
   'seo_title', 'seo_description', 'availability',
 ] as const;
+
+/**
+ * True when Postgres/PostgREST rejected a write because `best_price` does not exist yet
+ * (migration 008 not applied). Lets saves keep working without that one column.
+ */
+function isMissingBestPriceColumn(error: { message?: string } | null | undefined): boolean {
+  return !!error?.message && /best_price/i.test(error.message) && /column|schema cache/i.test(error.message);
+}
+
+let warnedMissingBestPrice = false;
+function withoutBestPrice(row: Row): Row {
+  if (!warnedMissingBestPrice) {
+    warnedMissingBestPrice = true;
+    console.warn('products.best_price column missing: run supabase/migrations/008_best_price.sql. Saving without it.');
+  }
+  const { best_price: _omit, ...rest } = row;
+  void _omit;
+  return rest;
+}
 
 /** Whitelists product fields for an insert/update. Non-UUID category ids (demo ids) become null. */
 export function toProductRow(input: Partial<Product>): Row {
@@ -796,6 +815,7 @@ class DataRepository {
       retailer: data.retailer || 'Online Retailer',
       current_price: data.current_price || 0,
       original_price: data.original_price || null,
+      best_price: data.best_price || null,
       currency: data.currency || 'INR',
       discount: data.discount || 0,
       rating: data.rating ?? null,
@@ -818,11 +838,9 @@ class DataRepository {
       // Let Postgres generate the UUID unless the caller supplied a valid one.
       const row = toProductRow(newProduct);
       if (isUuid(data.id)) row.id = data.id;
-      const { data: inserted, error } = await sb
-        .from('products')
-        .insert(row)
-        .select(PRODUCT_DETAIL_SELECT)
-        .single();
+      const insert = (r: Row) => sb.from('products').insert(r).select(PRODUCT_DETAIL_SELECT).single();
+      let { data: inserted, error } = await insert(row);
+      if (isMissingBestPriceColumn(error)) ({ data: inserted, error } = await insert(withoutBestPrice(row)));
       if (error || !inserted) {
         throw new Error(`Failed to save product: ${error?.message ?? 'no row returned'}`);
       }
@@ -841,12 +859,11 @@ class DataRepository {
     const sb = this.supabase();
     if (sb) {
       if (!isUuid(id)) return null;
-      const { data, error } = await sb
-        .from('products')
-        .update({ ...toProductRow(updates), updated_at: new Date().toISOString() })
-        .eq('id', id)
-        .select(PRODUCT_DETAIL_SELECT)
-        .maybeSingle();
+      const update = (r: Row) =>
+        sb.from('products').update(r).eq('id', id).select(PRODUCT_DETAIL_SELECT).maybeSingle();
+      const row = { ...toProductRow(updates), updated_at: new Date().toISOString() };
+      let { data, error } = await update(row);
+      if (isMissingBestPriceColumn(error)) ({ data, error } = await update(withoutBestPrice(row)));
       if (error) throw new Error(`Failed to update product: ${error.message}`);
       if (data && updates.images !== undefined) {
         await this.replaceProductImages(sb, id, updates.images);
@@ -996,6 +1013,7 @@ class DataRepository {
       retailer: original.retailer,
       current_price: original.current_price,
       original_price: original.original_price ?? null,
+      best_price: original.best_price ?? null,
       currency: original.currency,
       discount: original.discount ?? null,
       rating: original.rating ?? null,
@@ -1358,6 +1376,7 @@ class DataRepository {
         retailer,
         current_price: Number(price),
         original_price: editedData?.original_price ?? extracted.original_price ?? null,
+        best_price: editedData?.best_price ?? extracted.best_price ?? null,
         discount: editedData?.discount ?? extracted.discount ?? null,
         rating: editedData?.rating ?? extracted.rating ?? null,
         review_count: editedData?.review_count ?? extracted.review_count ?? null,
@@ -1432,6 +1451,7 @@ class DataRepository {
         retailer: editedData?.retailer || item.extracted_data.retailer || 'Online Retailer',
         current_price: editedData?.current_price ?? (item.extracted_data.price || 0),
         original_price: editedData?.original_price ?? item.extracted_data.original_price,
+        best_price: editedData?.best_price ?? item.extracted_data.best_price,
         discount: editedData?.discount ?? item.extracted_data.discount,
         currency: 'INR',
         image_url: editedData?.image_url || item.extracted_data.image_url || '',

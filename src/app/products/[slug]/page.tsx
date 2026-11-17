@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Star, Check, Eye, Info } from 'lucide-react';
 import { db } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth';
-import { formatPrice } from '@/lib/utils/formatters';
+import { formatPrice, lowestPriceState } from '@/lib/utils/formatters';
 import { productJsonLd, truncate } from '@/lib/seo';
 import ProductGrid from '@/components/ProductGrid';
 import ProductImageGallery from '@/components/ProductImageGallery';
@@ -94,6 +94,7 @@ export default async function ProductDetailPage(props: ProductDetailPageProps) {
   const hasPrice = product.current_price > 0;
   const showOriginal = hasPrice && !!product.original_price && product.original_price > product.current_price;
   const savings = showOriginal ? product.original_price! - product.current_price : 0;
+  const lowest = lowestPriceState(product.current_price, product.best_price);
   const updated = formatUpdated(product.updated_at || product.created_at);
 
   const crumbs = [
@@ -173,6 +174,16 @@ export default async function ProductDetailPage(props: ProductDetailPageProps) {
                 {savings > 0 && (
                   <p className="tabular mt-1.5 text-sm font-medium text-brand-700">
                     You save {formatPrice(savings, product.currency)}
+                  </p>
+                )}
+                {lowest === 'lowest' && (
+                  <p className="mt-2 inline-flex items-center gap-1 rounded-md bg-red-600 px-2 py-0.5 text-xs font-bold text-white">
+                    🔥 Lowest price ever
+                  </p>
+                )}
+                {lowest === 'above' && (
+                  <p className="tabular mt-1.5 text-sm text-copy-secondary">
+                    Lowest price seen: {formatPrice(product.best_price!, product.currency)}
                   </p>
                 )}
               </>

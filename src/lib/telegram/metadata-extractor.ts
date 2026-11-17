@@ -36,12 +36,13 @@ export function detectRetailer(url: string): string {
     const parsed = new URL(url);
     const host = parsed.hostname.toLowerCase();
 
-    if (host.includes('amazon') || host.includes('amzn.to')) return 'Amazon India';
-    if (host.includes('flipkart') || host.includes('fkrt.it')) return 'Flipkart';
-    if (host.includes('myntra')) return 'Myntra';
+    // Full domains plus their affiliate short-link hosts (link.amazon, amzn.to/.in, fkrt.it/.co, myntr.it, ajiio.in …).
+    if (host.includes('amazon') || /(^|\.)amzn\./.test(host)) return 'Amazon India';
+    if (host.includes('flipkart') || /(^|\.)fkrt\./.test(host)) return 'Flipkart';
+    if (host.includes('myntra') || /(^|\.)myntr\./.test(host)) return 'Myntra';
     if (host.includes('nykaa')) return 'Nykaa';
     if (host.includes('tatacliq')) return 'Tata CLiQ';
-    if (host.includes('ajio')) return 'Ajio';
+    if (host.includes('ajio') || /(^|\.)ajiio\./.test(host)) return 'Ajio';
     if (host.includes('croma')) return 'Croma';
     if (host.includes('meesho')) return 'Meesho';
     if (host.includes('reliancedigital')) return 'Reliance Digital';

@@ -25,6 +25,7 @@ export default async function NewProductPage(props: NewProductPageProps) {
       retailer: x.retailer,
       current_price: x.price,
       original_price: x.original_price,
+      best_price: x.best_price,
       discount: x.discount,
       image_url: x.image_url,
       description: x.description,

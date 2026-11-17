@@ -5,6 +5,7 @@ import { audit } from '@/lib/audit';
 import { db } from '@/lib/db';
 import { slugify } from '@/lib/utils/slugify';
 import { extractProductIdentity } from '@/lib/telegram/deduplication';
+import { detectRetailer } from '@/lib/telegram/metadata-extractor';
 import {
   MAX_BULK_FILE_BYTES,
   MAX_BULK_ROWS,
@@ -94,22 +95,26 @@ export async function POST(req: NextRequest) {
         continue;
       }
       const r = parsed.row;
+      // Sheets often have no store column: work it out from the link (amazon / flipkart / myntra / ajio …).
+      const retailer = r.retailer || detectRetailer(r.affiliate_url);
+      const rowWarnings = r.retailer ? parsed.warnings : parsed.warnings.filter((w) => !w.startsWith('No retailer'));
       const dupKey = keysOf(r.affiliate_url).find((k) => known.has(k));
       if (dupKey) {
         failedRows.push({ row: rowNumber, reason: `Duplicate of ${known.get(dupKey)}`, data: raw });
         continue;
       }
 
-      const canPublish = autoPublish && !!r.image_url && !!r.retailer;
+      const canPublish = autoPublish && !!r.image_url && !!retailer;
       try {
         const product = await db.createProduct({
           title: r.title,
           slug: `${slugify(r.title) || 'product'}-${Math.random().toString(36).slice(2, 6)}`,
           description: r.description,
           category_id: r.category_id,
-          retailer: r.retailer,
+          retailer,
           current_price: r.current_price,
           original_price: r.original_price,
+          best_price: r.best_price,
           currency: r.currency,
           discount: r.discount,
           rating: r.rating,
@@ -125,7 +130,7 @@ export async function POST(req: NextRequest) {
         created.push(product.id);
         if (canPublish) publishedCount++;
         for (const k of keysOf(r.affiliate_url)) known.set(k, `row ${rowNumber} in this file`);
-        for (const w of parsed.warnings) warnings.push({ row: rowNumber, message: w });
+        for (const w of rowWarnings) warnings.push({ row: rowNumber, message: w });
       } catch (err) {
         failedRows.push({ row: rowNumber, reason: err instanceof Error ? err.message : String(err), data: raw });
       }

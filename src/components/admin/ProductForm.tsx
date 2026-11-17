@@ -24,6 +24,7 @@ export default function ProductForm({ initialProduct, categories, prefill, sourc
   const [slug, setSlug] = useState(initialProduct?.slug || '');
   const [currentPrice, setCurrentPrice] = useState<number>(seed?.current_price || 0);
   const [originalPrice, setOriginalPrice] = useState<number | undefined>(seed?.original_price || undefined);
+  const [bestPrice, setBestPrice] = useState<number | undefined>(seed?.best_price || undefined);
   const [currency, setCurrency] = useState(seed?.currency || 'INR');
   const [discount, setDiscount] = useState<number | undefined>(seed?.discount || undefined);
   const [retailer, setRetailer] = useState(seed?.retailer || 'Amazon India');
@@ -162,6 +163,7 @@ export default function ProductForm({ initialProduct, categories, prefill, sourc
       slug: slug.trim() || undefined,
       current_price: currentPrice,
       original_price: originalPrice,
+      best_price: bestPrice && bestPrice > 0 ? bestPrice : null,
       currency,
       discount,
       retailer,
@@ -270,7 +272,7 @@ export default function ProductForm({ initialProduct, categories, prefill, sourc
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
               <div>
                 <label className="block font-semibold text-copy-primary mb-1">Current Price *</label>
                 <input
@@ -290,6 +292,17 @@ export default function ProductForm({ initialProduct, categories, prefill, sourc
                   value={originalPrice || ''}
                   onChange={(e) => handleOriginalPriceChange(parseFloat(e.target.value) || 0)}
                   placeholder="₹ 2499"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-surface-border focus:outline-none focus:border-brand-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-copy-primary mb-1">Best Price (lowest ever)</label>
+                <input
+                  type="number"
+                  value={bestPrice || ''}
+                  onChange={(e) => setBestPrice(parseFloat(e.target.value) || undefined)}
+                  placeholder="₹ 1299"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-surface-border focus:outline-none focus:border-brand-500"
                 />
               </div>

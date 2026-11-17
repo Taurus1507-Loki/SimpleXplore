@@ -6,7 +6,7 @@ import Image from '@/components/SafeImage';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Star, Heart, ExternalLink, TrendingUp, ImageOff } from 'lucide-react';
 import { Product } from '@/types';
-import { formatPrice } from '@/lib/utils/formatters';
+import { formatPrice, lowestPriceState } from '@/lib/utils/formatters';
 import { useWishlist } from './WishlistContext';
 
 interface ProductCardProps {
@@ -22,6 +22,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
   const hasPrice = product.current_price > 0;
   const hasDiscount = !!product.discount && product.discount > 0;
   const showOriginal = hasPrice && !!product.original_price && product.original_price > product.current_price;
+  const lowest = lowestPriceState(product.current_price, product.best_price);
 
   return (
     <motion.article
@@ -50,6 +51,11 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
 
       {/* Badges */}
       <div className="pointer-events-none absolute left-2.5 top-2.5 flex flex-col items-start gap-1 sm:left-3 sm:top-3">
+        {lowest === 'lowest' && (
+          <span className="rounded-md bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white shadow-soft-sm">
+            🔥 Lowest price ever
+          </span>
+        )}
         {hasDiscount && (
           <span className="tabular rounded-md bg-accent-400 px-2 py-0.5 text-[11px] font-bold text-ink">
             {product.discount}% off
@@ -140,6 +146,11 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
               </p>
             ) : (
               <p className="text-xs font-medium text-copy-secondary">Check price at {product.retailer}</p>
+            )}
+            {lowest === 'above' && (
+              <p className="tabular mt-0.5 text-[11px] text-copy-muted">
+                Lowest: {formatPrice(product.best_price!, product.currency)}
+              </p>
             )}
           </div>
 

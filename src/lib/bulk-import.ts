@@ -8,7 +8,7 @@ import type { ProductAvailability } from '@/types';
 
 export type BulkField =
   | 'title' | 'description' | 'category' | 'retailer' | 'image_url' | 'current_price'
-  | 'original_price' | 'currency' | 'affiliate_url' | 'rating' | 'review_count' | 'featured' | 'trending' | 'availability';
+  | 'original_price' | 'best_price' | 'currency' | 'affiliate_url' | 'rating' | 'review_count' | 'featured' | 'trending' | 'availability';
 
 export interface BulkFieldDef {
   key: BulkField;
@@ -26,8 +26,9 @@ export const BULK_FIELDS: BulkFieldDef[] = [
   { key: 'retailer', label: 'Retailer', required: false, aliases: ['retailer', 'store', 'shop', 'merchant', 'seller', 'marketplace'] },
   { key: 'category', label: 'Category', required: false, aliases: ['category', 'department', 'section'] },
   { key: 'original_price', label: 'Original price (MRP)', required: false, aliases: ['original price', 'mrp', 'list price', 'regular price', 'was price'] },
+  { key: 'best_price', label: 'Best price (lowest ever)', required: false, aliases: ['best price', 'lowest price', 'lowest ever price', 'all time low'] },
   { key: 'currency', label: 'Currency', required: false, aliases: ['currency', 'currency code'] },
-  { key: 'description', label: 'Description', required: false, aliases: ['description', 'details', 'about', 'summary'] },
+  { key: 'description', label: 'Description', required: false, aliases: ['description', 'pin description', 'details', 'about', 'summary'] },
   { key: 'rating', label: 'Rating (0–5)', required: false, aliases: ['rating', 'stars', 'star rating'] },
   { key: 'review_count', label: 'Review count', required: false, aliases: ['review count', 'reviews', 'ratings count', 'number of reviews'] },
   { key: 'availability', label: 'Availability (in stock / out of stock)', required: false, aliases: ['availability', 'stock', 'in stock', 'stock status'] },
@@ -101,6 +102,7 @@ export interface ParsedRow {
   image_url: string;
   current_price: number;
   original_price: number | null;
+  best_price: number | null;
   discount: number | null;
   currency: string;
   affiliate_url: string;
@@ -139,6 +141,14 @@ export function parseRow(raw: Record<string, unknown>, mapping: ColumnMapping, c
   if (originalPrice !== null && originalPrice < current) {
     warnings.push('Original price was lower than current price and was ignored');
     originalPrice = null;
+  }
+
+  // Lowest price ever seen. Blank or unreadable is simply left unknown (never blocks the row).
+  const best = money(get('best_price'));
+  let bestPrice: number | null = null;
+  if (best !== undefined) {
+    if (Number.isNaN(best) || best <= 0) warnings.push('Best price is not a number and was ignored');
+    else bestPrice = best;
   }
 
   const image = text(get('image_url'));
@@ -184,6 +194,7 @@ export function parseRow(raw: Record<string, unknown>, mapping: ColumnMapping, c
       image_url: image,
       current_price: current,
       original_price: originalPrice,
+      best_price: bestPrice,
       discount: originalPrice ? Math.round(((originalPrice - current) / originalPrice) * 100) : null,
       currency,
       affiliate_url: affiliate,

@@ -3,7 +3,9 @@ import { isSafeExternalUrl } from '@/lib/utils/ssrf';
 import { resolveSafeUrl } from './url-unshortener';
 import { extractMetadataFromUrl, detectRetailer } from './metadata-extractor';
 import { extractProductIdentity } from './deduplication';
+import { parseDealTemplate, type DealTemplate } from './deal-template';
 import { TelegramImport, Product } from '@/types';
+import type { ExtractedProductInfo } from './metadata-extractor';
 
 // Regex to detect all URLs inside Telegram message text or caption
 const URL_REGEX = /(https?:\/\/[^\s<>"{}|\\^`\[\]]+)/gi;
@@ -80,9 +82,26 @@ interface ExtractedListing {
   currentPrice: number;
   originalPrice?: number;
   discount: number;
+  bestPrice?: number;
   extractedPayload: TelegramImport['extracted_data'];
   duplicateProduct?: Product;
   extractionStatus: 'success' | 'partial';
+}
+
+/** First line of the post that looks like a product name (skips headers like "🔥 LOOT DEAL ALERT! 🔥"). */
+function fallbackTitleFromMessage(messageText: string): string | undefined {
+  for (const raw of messageText.split(/\r?\n/)) {
+    const line = raw
+      .replace(URL_REGEX, '')
+      .replace(/[\p{Extended_Pictographic}\p{Emoji_Presentation}\u{FE0F}\u{200D}]/gu, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (line.length <= 5) continue;
+    // Skip promo/header/price lines.
+    if (/^(loot\s*)?deal(s)?\s*(alert)?!*$|^hurry\b|^(best\s*|lowest\s*|deal\s*|offer\s*)?price\s*[:\-]|^grab\s*it\s*now|^mrp\b/i.test(line)) continue;
+    return line;
+  }
+  return undefined;
 }
 
 /** Steps 2–3: resolve the link safely, read page metadata, merge with price hints and detect duplicates. */
@@ -90,28 +109,44 @@ async function extractListing(
   rawUrl: string,
   messageText: string,
   channelName: string,
-  priceHints: { price?: number; original_price?: number; discount?: number }
+  priceHints: { price?: number; original_price?: number; discount?: number },
+  deal?: DealTemplate | null
 ): Promise<ExtractedListing> {
-  // 2. Resolve shortened affiliate link safely
-  const resolvedUrl = await resolveSafeUrl(rawUrl);
-  const retailer = detectRetailer(resolvedUrl);
+  let resolvedUrl = rawUrl;
+  let metadata: ExtractedProductInfo = { retailer: detectRetailer(rawUrl), highlights: [] };
+  try {
+    // 2. Resolve shortened affiliate link safely
+    resolvedUrl = await resolveSafeUrl(rawUrl);
+    // 3. Extract metadata from target product page
+    metadata = await extractMetadataFromUrl(resolvedUrl);
+  } catch (err) {
+    // A post in the channel's deal template already carries name + price, so a blocked
+    // or failing product page must not lose the deal: keep the draft with what we have.
+    if (!deal) throw err;
+    console.warn(`Metadata lookup failed for ${rawUrl}; using deal template values only.`, err);
+  }
+  const retailerFromUrl = detectRetailer(resolvedUrl);
+  const retailer = retailerFromUrl === 'Online Retailer' ? detectRetailer(rawUrl) : retailerFromUrl;
 
-  // 3. Extract metadata from target product page
-  const metadata = await extractMetadataFromUrl(resolvedUrl);
+  // Prices: the channel's own template is authoritative; the page only fills gaps.
+  const currentPrice = deal?.price || metadata.price || priceHints.price || 0;
+  const rawOriginal = deal ? metadata.original_price : metadata.original_price || priceHints.original_price;
+  const originalPrice = rawOriginal && rawOriginal > currentPrice ? rawOriginal : undefined;
+  const discount = deal
+    ? originalPrice && currentPrice
+      ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100)
+      : 0
+    : metadata.discount ||
+      priceHints.discount ||
+      (originalPrice && currentPrice ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100) : 0);
+  const bestPrice = deal?.best_price;
 
-  // Consolidate extracted data with text hints (hints take precedence if metadata scraper misses)
-  const currentPrice = metadata.price || priceHints.price || 0;
-  const originalPrice = metadata.original_price || priceHints.original_price;
-  const discount =
-    metadata.discount ||
-    priceHints.discount ||
-    (originalPrice && currentPrice ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100) : 0);
-
-  // Clean fallback title if target page doesn't have OpenGraph
-  let title = metadata.title;
+  // Title: template name first, then the page title, then the first meaningful line of the post.
+  let title = deal?.title || metadata.title;
+  const titleVerified = !!title;
   if (!title) {
-    const firstLine = messageText.split('\n')[0].replace(URL_REGEX, '').replace(/[🔥⚡💥deal!]/gi, '').trim();
-    title = firstLine.length > 5 ? firstLine : `${retailer} product`; // placeholder, flagged below
+    const line = fallbackTitleFromMessage(messageText);
+    title = line && line.length > 5 ? line : `${retailer} product`; // placeholder, flagged below
   }
 
   // Check for existing duplicates via normalized URL or Retailer Product ID (ASIN, etc.)
@@ -125,11 +160,13 @@ async function extractListing(
 
   const extractedPayload = {
     title,
-    description: metadata.description || messageText.trim(),
+    // Template posts are promo text, not a product description: leave it for the admin.
+    description: metadata.description || (deal ? '' : messageText.trim()),
     price: currentPrice,
     original_price: originalPrice,
+    best_price: bestPrice,
     discount,
-    retailer: metadata.retailer || retailer,
+    retailer,
     image_url: metadata.image_url || undefined, // never substitute a stock photo
     category: metadata.category || undefined,
     rating: metadata.rating,
@@ -138,7 +175,7 @@ async function extractListing(
     highlights: metadata.highlights && metadata.highlights.length > 0 ? metadata.highlights : [],
     // Anything we could not verify is left blank and listed here for the admin to fill in.
     missing_fields: [
-      ...(metadata.title ? [] : ['title']),
+      ...(titleVerified ? [] : ['title']),
       ...(metadata.image_url ? [] : ['image']),
       ...(currentPrice > 0 ? [] : ['price']),
       ...(metadata.category ? [] : ['category']),
@@ -156,15 +193,16 @@ async function extractListing(
     currentPrice,
     originalPrice,
     discount,
+    bestPrice,
     extractedPayload,
     duplicateProduct,
-    extractionStatus: metadata.title ? 'success' : 'partial',
+    extractionStatus: titleVerified ? 'success' : 'partial',
   };
 }
 
 /** Step 4. CRITICAL RULE: every Telegram-imported product is saved as a DRAFT until the admin approves it. */
 async function createDraftProduct(listing: ExtractedListing, rawUrl: string): Promise<Product> {
-  const { title, currentPrice, originalPrice, discount, extractedPayload } = listing;
+  const { title, currentPrice, originalPrice, discount, bestPrice, extractedPayload } = listing;
   return db.createProduct({
     title,
     slug: title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Math.random().toString(36).substr(2, 4),
@@ -173,6 +211,7 @@ async function createDraftProduct(listing: ExtractedListing, rawUrl: string): Pr
     retailer: extractedPayload.retailer,
     current_price: currentPrice,
     original_price: originalPrice,
+    best_price: bestPrice ?? null,
     currency: 'INR',
     discount,
     rating: extractedPayload.rating ?? null, // never invent ratings
@@ -207,7 +246,13 @@ export async function retryTelegramImport(importId: string): Promise<RetryResult
 
   const messageText = item.extracted_data?.raw_message || '';
   try {
-    const listing = await extractListing(rawUrl, messageText, 'Telegram', extractPriceHintsFromText(messageText));
+    const listing = await extractListing(
+      rawUrl,
+      messageText,
+      'Telegram',
+      extractPriceHintsFromText(messageText),
+      parseDealTemplate(messageText)
+    );
     const draftProduct = await createDraftProduct(listing, rawUrl);
     const updated = await db.updateTelegramImport(importId, {
       product_id: draftProduct.id,
@@ -239,7 +284,9 @@ export async function processTelegramPost(
   isEdited = false
 ): Promise<TelegramImport[]> {
   const messageText = post.text || post.caption || '';
-  const detectedUrls = extractUrlsFromMessage(messageText);
+  const deal = parseDealTemplate(messageText);
+  // A template post is about ONE product: only import its "Grab it now" link.
+  const detectedUrls = deal?.url ? [deal.url] : extractUrlsFromMessage(messageText);
   const results: TelegramImport[] = [];
 
   if (detectedUrls.length === 0) {
@@ -264,8 +311,8 @@ export async function processTelegramPost(
     }
 
     try {
-      const listing = await extractListing(rawUrl, messageText, channelName, priceHints);
-      const { resolvedUrl, title, currentPrice, originalPrice, discount, extractedPayload, duplicateProduct } = listing;
+      const listing = await extractListing(rawUrl, messageText, channelName, priceHints, deal);
+      const { resolvedUrl, title, currentPrice, originalPrice, discount, bestPrice, extractedPayload, duplicateProduct } = listing;
 
       // If this is an edit of an existing unapproved draft, update in-place instead of creating new
       if (isEdited && duplicateProduct && duplicateProduct.status === 'draft') {
@@ -273,8 +320,9 @@ export async function processTelegramPost(
           title,
           current_price: currentPrice,
           original_price: originalPrice,
+          ...(bestPrice ? { best_price: bestPrice } : {}),
           discount,
-          description: extractedPayload.description,
+          description: extractedPayload.description || undefined,
         });
 
         const importRecord = await db.createTelegramImport({

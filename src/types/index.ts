@@ -39,6 +39,8 @@ export interface Product {
   retailer: string;
   current_price: number;
   original_price?: number | null;
+  /** Lowest price this product has ever been seen at ("Best Price" in the Telegram post). Not the MRP. */
+  best_price?: number | null;
   currency: string;
   discount?: number | null;
   rating?: number | null;
@@ -116,6 +118,8 @@ export interface TelegramImport {
     description?: string;
     price?: number;
     original_price?: number;
+    /** Lowest price ever ("Best Price" in the channel's deal template). */
+    best_price?: number;
     discount?: number;
     retailer?: string;
     image_url?: string;
