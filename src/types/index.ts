@@ -181,6 +181,7 @@ export interface WebsiteSettings {
     telegram?: string;
     instagram?: string;
     facebook?: string;
+    pinterest?: string;
   };
   affiliate_disclosure: string;
   homepage_config: {

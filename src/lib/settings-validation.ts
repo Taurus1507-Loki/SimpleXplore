@@ -52,7 +52,7 @@ export function validateSettingsInput(raw: unknown): { update?: Partial<WebsiteS
   if (input.social_links !== undefined) {
     const links = (input.social_links && typeof input.social_links === 'object' ? input.social_links : {}) as Record<string, unknown>;
     const clean: WebsiteSettings['social_links'] = {};
-    for (const key of ['telegram', 'instagram', 'twitter', 'facebook'] as const) {
+    for (const key of ['telegram', 'instagram', 'twitter', 'facebook', 'pinterest'] as const) {
       const v = typeof links[key] === 'string' ? (links[key] as string).trim() : '';
       if (!v) continue;
       if (!/^https:\/\/[^\s]+$/.test(v)) errors.push(`${key[0].toUpperCase() + key.slice(1)} link must start with https://`);

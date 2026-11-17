@@ -31,10 +31,14 @@ export async function POST(req: NextRequest) {
 
   if (isSupabaseConfigured()) {
     const supabase = await createServerSupabaseClient();
+    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || req.nextUrl.origin).replace(/\/+$/, '');
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: {
+        data: { full_name: fullName },
+        emailRedirectTo: `${siteUrl}/login`,
+      },
     });
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     // With email confirmation enabled Supabase returns no session until the link is clicked.
