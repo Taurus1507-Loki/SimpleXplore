@@ -155,6 +155,7 @@ export default function Header({ initialEmail, initialIsAdmin, socialLinks }: He
   };
 
   return (
+    <>
     <header className="sticky top-0 z-40 border-b border-surface-border bg-white/90 backdrop-blur-md supports-[backdrop-filter]:bg-white/80">
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:gap-6 sm:px-6 lg:px-8">
         <Logo className="shrink-0" />
@@ -327,28 +328,29 @@ export default function Header({ initialEmail, initialIsAdmin, socialLinks }: He
           </ul>
         </div>
       </nav>
+    </header>
 
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <>
-            <motion.div
-              aria-hidden="true"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              onClick={() => setMobileMenuOpen(false)}
-              className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-[1px] md:hidden"
-            />
-            <motion.nav
-              id="mobile-menu"
-              aria-label="Mobile"
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-              className="fixed inset-y-0 right-0 z-50 flex w-[82%] max-w-xs flex-col bg-white shadow-2xl md:hidden"
-            >
+    <AnimatePresence>
+      {mobileMenuOpen && (
+        <>
+          <motion.div
+            aria-hidden="true"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setMobileMenuOpen(false)}
+            className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-[1px] md:hidden"
+          />
+          <motion.nav
+            id="mobile-menu"
+            aria-label="Mobile"
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="fixed top-0 right-0 z-50 flex h-dvh w-[82%] max-w-xs flex-col bg-white shadow-2xl md:hidden"
+          >
               <div className="flex items-center justify-between border-b border-surface-border px-4 py-3">
                 <span className="font-display text-sm font-bold text-ink">Menu</span>
                 <button
@@ -435,10 +437,10 @@ export default function Header({ initialEmail, initialIsAdmin, socialLinks }: He
                   </>
                 )}
               </div>
-            </motion.nav>
-          </>
-        )}
-      </AnimatePresence>
-    </header>
+          </motion.nav>
+        </>
+      )}
+    </AnimatePresence>
+    </>
   );
 }
