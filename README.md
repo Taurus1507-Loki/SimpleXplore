@@ -87,7 +87,9 @@ supabase/migrations/003_storage_product_images.sql
 supabase/migrations/004_telegram_update_queue.sql
 supabase/migrations/005_audit_log_details.sql
 supabase/migrations/006_logo_and_availability.sql
+supabase/migrations/007_fix_role_guard.sql
 ```
+Migration 007 fixes the role guard from 002 so the database owner (SQL Editor) can grant the admin role, while website users still cannot change their own role.
 Migration 006 adds the uploadable site logo and product stock status (in stock / limited / out of stock — only recorded when the retailer states it).
 Migration 005 makes the admin audit log append-only and records the admin's email (Admin → Audit Log).
 Migration 004 adds the Telegram processing queue: the webhook stores each post and replies to Telegram immediately, and extraction runs in the background (Vercel `waitUntil`). A daily Vercel Cron (`vercel.json`) calls `/api/telegram/process` as a safety net for anything left behind — set `CRON_SECRET` in Vercel. Admins can also click **Process queue now** on the Telegram page. Failed runs are retried up to 3 times, 5 minutes apart.

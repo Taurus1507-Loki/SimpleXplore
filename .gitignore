@@ -11,3 +11,6 @@ dist/
 
 # Demo-mode image uploads
 public/uploads/
+
+# Private deployment values
+vercel-env.local.txt

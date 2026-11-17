@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Product, Category } from '@/types';
 import ProductCard from './ProductCard';
 import { formatPrice } from '@/lib/utils/formatters';
@@ -37,6 +37,21 @@ export default function ProductCatalogClient({
   const [minRating, setMinRating] = useState<number>(0);
   const [sortBy, setSortBy] = useState<'newest' | 'price_low' | 'price_high' | 'discount' | 'rating'>('newest');
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+
+  // Close mobile filter drawer on Escape and prevent background scroll while open
+  useEffect(() => {
+    if (!mobileFilterOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileFilterOpen(false);
+    };
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [mobileFilterOpen]);
 
   // Compute price range from products
   const maxProductPrice = useMemo(() => {
@@ -183,27 +198,51 @@ export default function ProductCatalogClient({
         </div>
       </div>
 
-      {/* Main 2-column layout: Left Filter sidebar, Right Product Grid */}
+      {/* Mobile backdrop */}
+      {mobileFilterOpen && (
+        <div
+          aria-hidden="true"
+          onClick={() => setMobileFilterOpen(false)}
+          className="fixed inset-0 z-40 bg-ink/40 backdrop-blur-[1px] md:hidden"
+        />
+      )}
+
+      {/* Main 2-column layout: Left Filter drawer (mobile) / sidebar (desktop), Right Product Grid */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-        {/* Left Filter Sidebar (3 cols on desktop) */}
-        <aside className={`md:col-span-3 space-y-6 bg-white p-5 rounded-3xl border border-surface-border shadow-soft-sm ${
-          mobileFilterOpen ? 'block' : 'hidden md:block'
-        }`}>
-          <div className="flex items-center justify-between border-b border-surface-border pb-3">
+        {/* Left Filter Sidebar / Mobile Left Drawer */}
+        <aside
+          aria-label="Product filters"
+          className={`fixed inset-y-0 left-0 z-50 flex w-[84%] max-w-xs flex-col bg-white shadow-2xl transition-transform duration-200 ease-out md:static md:inset-auto md:z-auto md:col-span-3 md:w-auto md:max-w-none md:translate-x-0 md:rounded-3xl md:border md:border-surface-border md:shadow-soft-sm ${
+            mobileFilterOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+          }`}
+        >
+          <div className="flex items-center justify-between border-b border-surface-border px-5 py-4 md:pb-3 md:pt-5">
             <h3 className="font-bold text-sm text-copy-primary flex items-center gap-2 font-display">
               <SlidersHorizontal className="w-4 h-4 text-brand-600" />
               Refine Search
             </h3>
-            {hasActiveFilters && (
+            <div className="flex items-center gap-3">
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="text-[11px] font-semibold text-red-700 hover:underline"
+                >
+                  Clear all
+                </button>
+              )}
               <button
                 type="button"
-                onClick={handleResetFilters}
-                className="text-[11px] font-semibold text-red-700 hover:underline"
+                onClick={() => setMobileFilterOpen(false)}
+                aria-label="Close filters"
+                className="md:hidden inline-flex h-8 w-8 items-center justify-center rounded-lg border border-surface-border text-copy-secondary hover:bg-surface-bg"
               >
-                Clear all
+                <X className="w-4 h-4" />
               </button>
-            )}
+            </div>
           </div>
+
+          <div className="flex-1 overflow-y-auto p-5 space-y-6">
 
           {/* Department / Category Filter */}
           <div className="space-y-2">
@@ -404,6 +443,27 @@ export default function ProductCatalogClient({
                 </button>
               ))}
             </div>
+          </div>
+          </div>
+
+          {/* Mobile Drawer Footer */}
+          <div className="md:hidden border-t border-surface-border bg-white p-4 flex items-center gap-2">
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="px-3.5 py-2.5 rounded-xl border border-surface-border text-xs font-semibold text-copy-secondary hover:bg-surface-bg"
+              >
+                Reset
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setMobileFilterOpen(false)}
+              className="flex-1 rounded-xl bg-brand-600 hover:bg-brand-700 py-2.5 px-4 text-xs font-bold text-white shadow-sm transition-colors"
+            >
+              Done · Show {filteredProducts.length} {filteredProducts.length === 1 ? 'deal' : 'deals'}
+            </button>
           </div>
         </aside>
 
