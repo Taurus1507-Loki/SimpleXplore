@@ -157,6 +157,16 @@ export default function ProductCatalogClient({
     });
   }, [initialProducts, categories, debounced]);
 
+  // Sync with mobile header live search (debounced 300ms below)
+  useEffect(() => {
+    const onMobileSearch = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (typeof detail === 'string') setSearchQuery(detail);
+    };
+    window.addEventListener('sx:mobile-search', onMobileSearch);
+    return () => window.removeEventListener('sx:mobile-search', onMobileSearch);
+  }, []);
+
   const handleResetFilters = () => {
     setSelectedCategory('all');
     setSelectedRetailer('all');
@@ -166,6 +176,9 @@ export default function ProductCatalogClient({
     setMinPrice(0);
     setMaxPrice(maxProductPrice);
     setSortBy('newest');
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sx:mobile-search-reset'));
+    }
   };
 
   const hasActiveFilters = 
@@ -178,19 +191,10 @@ export default function ProductCatalogClient({
     maxPrice < maxProductPrice;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20 md:pb-0">
       {/* Top Controls Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-surface-border shadow-soft-sm">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setMobileFilterOpen(!mobileFilterOpen)}
-            className="md:hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-bg border border-surface-border text-xs font-semibold text-copy-primary"
-          >
-            <SlidersHorizontal className="w-4 h-4 text-brand-600" />
-            <span>Filters {hasActiveFilters && '(Active)'}</span>
-          </button>
-
+        <div className="flex items-center justify-between sm:justify-start gap-2">
           <span className="text-xs font-medium text-copy-secondary">
             Showing <strong className="text-copy-primary font-bold">{filteredProducts.length}</strong> of {initialProducts.length} verified deals
           </span>
@@ -207,14 +211,14 @@ export default function ProductCatalogClient({
           )}
         </div>
 
-        {/* Sort dropdown */}
-        <div className="flex items-center gap-2">
+        {/* Desktop Sort dropdown (mobile uses the bottom-fixed bar) */}
+        <div className="hidden md:flex items-center gap-2">
           <span className="text-xs text-copy-muted flex items-center gap-1">
             <ArrowUpDown className="w-3.5 h-3.5" /> Sort:
           </span>
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
             className="text-xs font-semibold bg-surface-bg border border-surface-border rounded-xl px-3 py-1.5 text-copy-primary focus:outline-none focus:border-brand-500"
           >
             <option value="newest">Newest Arrivals</option>
@@ -523,6 +527,35 @@ export default function ProductCatalogClient({
               ))}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Mobile Bottom-Fixed Filter & Sort Bar */}
+      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-2.5 border-t border-surface-border bg-white/95 px-4 py-2.5 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] backdrop-blur-md md:hidden">
+        <button
+          type="button"
+          onClick={() => setMobileFilterOpen(true)}
+          className="flex-1 inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-surface-border bg-surface-bg px-3 text-xs font-semibold text-copy-primary active:scale-[0.98]"
+        >
+          <SlidersHorizontal className="h-4 w-4 text-brand-600" aria-hidden="true" />
+          <span>Filters{hasActiveFilters ? ' •' : ''}</span>
+        </button>
+
+        <div className="flex flex-1 min-h-[42px] items-center gap-1.5 rounded-xl border border-surface-border bg-surface-bg px-3">
+          <ArrowUpDown className="h-3.5 w-3.5 shrink-0 text-brand-600" aria-hidden="true" />
+          <label htmlFor="mobile-sort" className="sr-only">Sort products</label>
+          <select
+            id="mobile-sort"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+            className="w-full bg-transparent py-2 text-xs font-semibold text-copy-primary focus:outline-none"
+          >
+            <option value="newest">Sort: Newest</option>
+            <option value="discount">Sort: Discount</option>
+            <option value="price_low">Price: Low to High</option>
+            <option value="price_high">Price: High to Low</option>
+            <option value="rating">Sort: Rating</option>
+          </select>
         </div>
       </div>
     </div>

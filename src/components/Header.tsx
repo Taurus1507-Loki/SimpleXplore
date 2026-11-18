@@ -41,9 +41,45 @@ function isActive(pathname: string, href: string, exact?: boolean) {
   return exact ? pathname === href : pathname === href || pathname.startsWith(href + '/');
 }
 
-function SearchForm({ id, onSubmitted }: { id: string; onSubmitted?: () => void }) {
+function SearchForm({
+  id,
+  onSubmitted,
+  liveSearch = false,
+}: {
+  id: string;
+  onSubmitted?: () => void;
+  liveSearch?: boolean;
+}) {
   const router = useRouter();
+  const pathname = usePathname();
   const [query, setQuery] = useState('');
+  const liveSearchEnabled = liveSearch && (pathname === '/' || pathname === '/products');
+
+  // Keep mobile search bar in sync if user clicks Reset in the catalog
+  useEffect(() => {
+    if (!liveSearch) return;
+    const onReset = () => setQuery('');
+    window.addEventListener('sx:mobile-search-reset', onReset);
+    return () => window.removeEventListener('sx:mobile-search-reset', onReset);
+  }, [liveSearch]);
+
+  // On non-catalog pages (e.g. /deals), debounce 300ms then navigate to /products?search=...
+  useEffect(() => {
+    if (!liveSearch || liveSearchEnabled) return;
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    const t = setTimeout(() => {
+      router.push(`/products?search=${encodeURIComponent(trimmed)}`);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [liveSearch, liveSearchEnabled, query, router]);
+
+  const handleChange = (next: string) => {
+    setQuery(next);
+    if (liveSearchEnabled) {
+      window.dispatchEvent(new CustomEvent('sx:mobile-search', { detail: next }));
+    }
+  };
 
   return (
     <form
@@ -51,6 +87,11 @@ function SearchForm({ id, onSubmitted }: { id: string; onSubmitted?: () => void 
       onSubmit={(e) => {
         e.preventDefault();
         const q = query.trim();
+        if (liveSearchEnabled) {
+          window.dispatchEvent(new CustomEvent('sx:mobile-search', { detail: query }));
+          onSubmitted?.();
+          return;
+        }
         if (!q) return;
         router.push(`/products?search=${encodeURIComponent(q)}`);
         onSubmitted?.();
@@ -68,15 +109,30 @@ function SearchForm({ id, onSubmitted }: { id: string; onSubmitted?: () => void 
         autoComplete="off"
         placeholder="Search sneakers, earbuds, air fryers…"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        className="h-11 w-full rounded-xl border border-surface-border bg-surface-muted pl-11 pr-24 text-sm text-copy-primary placeholder:text-copy-muted transition-colors hover:border-brand-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-500/10"
+        onChange={(e) => handleChange(e.target.value)}
+        className={`h-11 w-full rounded-xl border border-surface-border bg-surface-muted pl-11 text-sm text-copy-primary placeholder:text-copy-muted transition-colors hover:border-brand-200 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-500/10 ${
+          liveSearch ? 'pr-10' : 'pr-24'
+        }`}
       />
-      <button
-        type="submit"
-        className="absolute right-1.5 top-1/2 h-8 -translate-y-1/2 rounded-lg bg-ink px-4 text-xs font-semibold text-white transition-colors hover:bg-brand-700 active:scale-[0.97]"
-      >
-        Search
-      </button>
+      {liveSearch ? (
+        query ? (
+          <button
+            type="button"
+            onClick={() => handleChange('')}
+            aria-label="Clear search"
+            className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-copy-muted hover:bg-surface-border/60 hover:text-copy-primary"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        ) : null
+      ) : (
+        <button
+          type="submit"
+          className="absolute right-1.5 top-1/2 h-8 -translate-y-1/2 rounded-lg bg-ink px-4 text-xs font-semibold text-white transition-colors hover:bg-brand-700 active:scale-[0.97]"
+        >
+          Search
+        </button>
+      )}
     </form>
   );
 }
@@ -284,9 +340,9 @@ export default function Header({ initialEmail, initialIsAdmin, socialLinks }: He
         </div>
       </div>
 
-      {/* Mobile: search is always one tap away. */}
+      {/* Mobile: letter-by-letter live search (no search button). */}
       <div className="px-4 pb-3 md:hidden">
-        <SearchForm id="mobile-search" />
+        <SearchForm id="mobile-search" liveSearch />
       </div>
 
       {/* Desktop sub-navigation with a shared-layout active indicator. */}
