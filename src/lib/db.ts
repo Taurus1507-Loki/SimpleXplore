@@ -236,6 +236,7 @@ export const initialSettings: WebsiteSettings = {
     twitter: 'https://twitter.com/simplexplore',
     telegram: 'https://t.me/simplexplore_deals',
     instagram: 'https://instagram.com/simplexplore',
+    pinterest: 'https://in.pinterest.com/SimpleXplore/',
   },
   affiliate_disclosure: 'SimpleXplore is a reader-supported shopping discovery platform. When you buy through affiliate links on our site, we may earn an affiliate commission at no additional cost to you. Product prices and availability are accurate as of the date/time indicated and are subject to change by retailer.',
   homepage_config: {
