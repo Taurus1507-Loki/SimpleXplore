@@ -52,7 +52,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
       {/* Badges */}
       <div className="pointer-events-none absolute left-2.5 top-2.5 flex flex-col items-start gap-1 sm:left-3 sm:top-3">
         {lowest === 'lowest' && (
-          <span className="rounded-md bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white shadow-soft-sm">
+          <span className="hidden md:inline-block rounded-md bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white shadow-soft-sm">
             🔥 Lowest price ever
           </span>
         )}
@@ -162,7 +162,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
               <p className="text-xs font-medium text-copy-secondary">Check current price</p>
             )}
             {lowest === 'above' && (
-              <p className="tabular mt-0.5 text-[11px] text-copy-muted">
+              <p className="tabular mt-0.5 hidden text-[11px] text-copy-muted md:block">
                 Lowest: {formatPrice(product.best_price!, product.currency)}
               </p>
             )}

@@ -192,8 +192,8 @@ export default function ProductCatalogClient({
 
   return (
     <div className="space-y-6 pb-20 md:pb-0">
-      {/* Top Controls Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-surface-border shadow-soft-sm">
+      {/* Top Controls Bar (desktop only; mobile uses bottom-fixed bar and opens directly to cards) */}
+      <div className="hidden md:flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-surface-border shadow-soft-sm">
         <div className="flex items-center justify-between sm:justify-start gap-2">
           <span className="text-xs font-medium text-copy-secondary">
             Showing <strong className="text-copy-primary font-bold">{filteredProducts.length}</strong> of {initialProducts.length} verified deals

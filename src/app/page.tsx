@@ -6,7 +6,6 @@ import Hero from '@/components/Hero';
 import CategoryBar from '@/components/CategoryBar';
 import ProductGrid from '@/components/ProductGrid';
 import ProductCatalogClient from '@/components/ProductCatalogClient';
-import PageHeader from '@/components/PageHeader';
 import SectionHeader from '@/components/SectionHeader';
 import { Reveal } from '@/components/motion/Reveal';
 import { Product } from '@/types';
@@ -72,14 +71,8 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* Mobile: show Home > Products catalog directly */}
-      <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 md:hidden">
-        <PageHeader
-          crumbs={[{ name: 'Products', path: '/products' }]}
-          eyebrow="Catalog"
-          title="All products"
-          description="Handpicked products from India's leading online stores. Filter by category, retailer, price or discount."
-        />
+      {/* Mobile: show product cards directly */}
+      <div className="mx-auto max-w-7xl px-4 py-4 md:hidden">
         <ProductCatalogClient initialProducts={allPublished.products} categories={categories} />
       </div>
 
