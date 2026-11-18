@@ -62,6 +62,34 @@ export default function ProductCatalogClient({
   const [minPrice, setMinPrice] = useState<number>(0);
   const [maxPrice, setMaxPrice] = useState<number>(maxProductPrice);
 
+  // Debounce filtering by 300ms so sliders, inputs, and rapid taps stay smooth
+  const [debounced, setDebounced] = useState({
+    selectedCategory,
+    selectedRetailer,
+    minPrice,
+    maxPrice,
+    minDiscount,
+    minRating,
+    searchQuery,
+    sortBy,
+  });
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setDebounced({
+        selectedCategory,
+        selectedRetailer,
+        minPrice,
+        maxPrice,
+        minDiscount,
+        minRating,
+        searchQuery,
+        sortBy,
+      });
+    }, 300);
+    return () => clearTimeout(id);
+  }, [selectedCategory, selectedRetailer, minPrice, maxPrice, minDiscount, minRating, searchQuery, sortBy]);
+
   const retailers = useMemo(() => {
     const set = new Set<string>();
     initialProducts.forEach(p => {
@@ -70,38 +98,49 @@ export default function ProductCatalogClient({
     return Array.from(set);
   }, [initialProducts]);
 
-  // Reactive filtering
+  // Reactive filtering (from 300ms debounced state)
   const filteredProducts = useMemo(() => {
+    const {
+      selectedCategory: catSlug,
+      selectedRetailer: ret,
+      minPrice: minP,
+      maxPrice: maxP,
+      minDiscount: minD,
+      minRating: minR,
+      searchQuery: q,
+      sortBy: sort,
+    } = debounced;
+
     return initialProducts.filter(p => {
       // Category filter
-      if (selectedCategory !== 'all') {
-        const cat = categories.find(c => c.slug === selectedCategory);
+      if (catSlug !== 'all') {
+        const cat = categories.find(c => c.slug === catSlug);
         if (cat && p.category_id !== cat.id) return false;
       }
 
       // Retailer filter
-      if (selectedRetailer !== 'all' && p.retailer.toLowerCase() !== selectedRetailer.toLowerCase()) {
+      if (ret !== 'all' && p.retailer.toLowerCase() !== ret.toLowerCase()) {
         return false;
       }
 
       // Price limit filter (min and max)
-      if (p.current_price < minPrice || p.current_price > maxPrice) {
+      if (p.current_price < minP || p.current_price > maxP) {
         return false;
       }
 
       // Discount filter
-      if (minDiscount > 0 && (p.discount || 0) < minDiscount) {
+      if (minD > 0 && (p.discount || 0) < minD) {
         return false;
       }
 
       // Rating filter
-      if (minRating > 0 && (p.rating || 0) < minRating) {
+      if (minR > 0 && (p.rating || 0) < minR) {
         return false;
       }
 
       // Search query filter
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase().trim();
+      if (q.trim()) {
+        const query = q.toLowerCase().trim();
         const matchesTitle = p.title.toLowerCase().includes(query);
         const matchesRetailer = p.retailer.toLowerCase().includes(query);
         const matchesDesc = p.description?.toLowerCase().includes(query);
@@ -110,24 +149,13 @@ export default function ProductCatalogClient({
 
       return true;
     }).sort((a, b) => {
-      if (sortBy === 'price_low') return a.current_price - b.current_price;
-      if (sortBy === 'price_high') return b.current_price - a.current_price;
-      if (sortBy === 'discount') return (b.discount || 0) - (a.discount || 0);
-      if (sortBy === 'rating') return (b.rating || 0) - (a.rating || 0);
+      if (sort === 'price_low') return a.current_price - b.current_price;
+      if (sort === 'price_high') return b.current_price - a.current_price;
+      if (sort === 'discount') return (b.discount || 0) - (a.discount || 0);
+      if (sort === 'rating') return (b.rating || 0) - (a.rating || 0);
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
-  }, [
-    initialProducts, 
-    categories, 
-    selectedCategory, 
-    selectedRetailer, 
-    minPrice,
-    maxPrice, 
-    minDiscount, 
-    minRating, 
-    searchQuery, 
-    sortBy
-  ]);
+  }, [initialProducts, categories, debounced]);
 
   const handleResetFilters = () => {
     setSelectedCategory('all');
@@ -244,10 +272,10 @@ export default function ProductCatalogClient({
 
           <div className="flex-1 overflow-y-auto p-5 space-y-6">
 
-          {/* Department / Category Filter */}
+          {/* Category Filter */}
           <div className="space-y-2">
             <label className="block text-xs font-bold text-copy-primary uppercase tracking-wider">
-              Department
+              Category
             </label>
             <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
               <button
@@ -259,7 +287,7 @@ export default function ProductCatalogClient({
                     : 'text-copy-secondary hover:bg-surface-bg'
                 }`}
               >
-                <span>All Departments</span>
+                <span>All Categories</span>
                 {selectedCategory === 'all' && <Check className="w-3.5 h-3.5 text-brand-600" />}
               </button>
 

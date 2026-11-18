@@ -80,6 +80,15 @@ export const initialCategories: Category[] = [
     sort_order: 7,
   },
   {
+    id: 'cat-home-decor',
+    name: 'Home Decor',
+    slug: 'home-decor',
+    description: 'Wall art, lamps, cushions, planters and home accents',
+    image: 'https://images.unsplash.com/photo-1513519245088-029295015038?w=600&auto=format&fit=crop&q=80',
+    is_active: true,
+    sort_order: 8,
+  },
+  {
     id: 'cat-accessories',
     name: 'Accessories',
     slug: 'accessories',

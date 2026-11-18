@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { TelegramImport, Category, Product } from '@/types';
 import { formatPrice } from '@/lib/utils/formatters';
 import { isOpenableHttpUrl } from '@/lib/utils/clipboard-image';
+import { matchCategory } from '@/lib/telegram/category-guesser';
 import { 
   CheckCircle2, 
   XCircle, 
@@ -40,7 +41,13 @@ export default function ReviewClient({ initialImport, categories }: ReviewClient
   const [discount, setDiscount] = useState<number | undefined>(ext.discount ?? live?.discount ?? undefined);
   const [retailer, setRetailer] = useState(ext.retailer || live?.retailer || '');
   const [imageUrl, setImageUrl] = useState(ext.image_url || live?.image_url || '');
-  const [categoryId, setCategoryId] = useState(live?.category_id || categories[0]?.id || '');
+  const [categoryId, setCategoryId] = useState(
+    live?.category_id ||
+      importItem.product?.category_id ||
+      matchCategory(categories, ext.category)?.id ||
+      categories[0]?.id ||
+      ''
+  );
   const [description, setDescription] = useState(ext.description || live?.description || '');
   const [affiliateUrl, setAffiliateUrl] = useState(importItem.affiliate_url || importItem.original_url);
   const [isFeatured, setIsFeatured] = useState(live?.featured ?? false);

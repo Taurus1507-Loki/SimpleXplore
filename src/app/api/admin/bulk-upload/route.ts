@@ -6,6 +6,7 @@ import { db } from '@/lib/db';
 import { slugify } from '@/lib/utils/slugify';
 import { extractProductIdentity } from '@/lib/telegram/deduplication';
 import { detectRetailer } from '@/lib/telegram/metadata-extractor';
+import { guessCategorySlugFromTitle, matchCategory } from '@/lib/telegram/category-guesser';
 import {
   MAX_BULK_FILE_BYTES,
   MAX_BULK_ROWS,
@@ -106,11 +107,13 @@ export async function POST(req: NextRequest) {
 
       const canPublish = autoPublish && !!r.image_url && !!retailer;
       try {
+        const guessedSlug = !r.category_id ? guessCategorySlugFromTitle(r.title) : undefined;
+        const resolvedCategoryId = r.category_id ?? matchCategory(categories, guessedSlug)?.id ?? null;
         const product = await db.createProduct({
           title: r.title,
           slug: `${slugify(r.title) || 'product'}-${Math.random().toString(36).slice(2, 6)}`,
           description: r.description,
-          category_id: r.category_id,
+          category_id: resolvedCategoryId,
           retailer,
           current_price: r.current_price,
           original_price: r.original_price,

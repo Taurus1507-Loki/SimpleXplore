@@ -4,6 +4,7 @@ import { resolveSafeUrl } from './url-unshortener';
 import { extractMetadataFromUrl, detectRetailer } from './metadata-extractor';
 import { extractProductIdentity } from './deduplication';
 import { parseDealTemplate, type DealTemplate } from './deal-template';
+import { guessCategorySlugFromTitle, matchCategory } from './category-guesser';
 import { TelegramImport, Product } from '@/types';
 import type { ExtractedProductInfo } from './metadata-extractor';
 
@@ -158,6 +159,12 @@ async function extractListing(
     return identity.normalizedUrl === pId.normalizedUrl;
   });
 
+  const categories = await db.getCategories();
+  const guessedCategory = !metadata.category
+    ? matchCategory(categories, guessCategorySlugFromTitle(title))
+    : matchCategory(categories, metadata.category);
+  const categoryName = metadata.category || guessedCategory?.name || undefined;
+
   const extractedPayload = {
     title,
     // Template posts are promo text, not a product description: leave it for the admin.
@@ -168,7 +175,7 @@ async function extractListing(
     discount,
     retailer,
     image_url: metadata.image_url || undefined, // never substitute a stock photo
-    category: metadata.category || undefined,
+    category: categoryName,
     rating: metadata.rating,
     review_count: metadata.review_count,
     availability: metadata.availability,
@@ -178,7 +185,7 @@ async function extractListing(
       ...(titleVerified ? [] : ['title']),
       ...(metadata.image_url ? [] : ['image']),
       ...(currentPrice > 0 ? [] : ['price']),
-      ...(metadata.category ? [] : ['category']),
+      ...(categoryName ? [] : ['category']),
     ],
     raw_message: messageText,
     is_duplicate: !!duplicateProduct,
@@ -203,11 +210,14 @@ async function extractListing(
 /** Step 4. CRITICAL RULE: every Telegram-imported product is saved as a DRAFT until the admin approves it. */
 async function createDraftProduct(listing: ExtractedListing, rawUrl: string): Promise<Product> {
   const { title, currentPrice, originalPrice, discount, bestPrice, extractedPayload } = listing;
+  const categories = await db.getCategories();
+  const matchedCat = matchCategory(categories, extractedPayload.category);
   return db.createProduct({
     title,
     slug: title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Math.random().toString(36).substr(2, 4),
     description: extractedPayload.description,
     highlights: extractedPayload.highlights,
+    category_id: matchedCat?.id ?? null,
     retailer: extractedPayload.retailer,
     current_price: currentPrice,
     original_price: originalPrice,

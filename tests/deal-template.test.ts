@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseDealTemplate } from '../src/lib/telegram/deal-template';
+import { guessCategorySlugFromTitle } from '../src/lib/telegram/category-guesser';
 import { processTelegramPost } from '../src/lib/telegram/service';
 import { detectRetailer } from '../src/lib/telegram/metadata-extractor';
 import { lowestPriceState } from '../src/lib/utils/formatters';
@@ -122,5 +123,15 @@ describe('Google Sheet bulk upload columns', () => {
     expect(res.row.best_price).toBe(399);
     expect(res.row.original_price).toBeNull();
     expect(res.row.description).toBe('Floral printed short kurti');
+  });
+});
+
+describe('Title-based category guessing', () => {
+  it('detects womens-fashion, mens-fashion, fashion fallback, and home-decor', () => {
+    expect(guessCategorySlugFromTitle('Amazon Brand - Tavasya Women Floral Printed Short Kurti')).toBe('womens-fashion');
+    expect(guessCategorySlugFromTitle("Allen Solly Men's Regular Fit Polo T-Shirt")).toBe('mens-fashion');
+    expect(guessCategorySlugFromTitle('Oversized Cotton Hoodie Sweatshirt')).toBe('fashion');
+    expect(guessCategorySlugFromTitle('Macrame Wall Hanging Home Decor')).toBe('home-decor');
+    expect(guessCategorySlugFromTitle('Random Unclassified Gizmo XYZ')).toBeUndefined();
   });
 });
