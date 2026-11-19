@@ -96,6 +96,11 @@ export default async function RootLayout({
           }}
         />
         <link rel="preconnect" href="https://images.unsplash.com" />
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3537884146403918"
+          crossOrigin="anonymous"
+        />
       </head>
       <body className="min-h-screen flex flex-col bg-surface-bg text-copy-primary font-sans">
         <a

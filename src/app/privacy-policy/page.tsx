@@ -33,12 +33,26 @@ export default function PrivacyPolicyPage() {
           When you click on an outbound affiliate link, an anonymous click event is registered to measure deal popularity and analytics. When redirected to merchant sites (like Amazon, Flipkart), those merchants may use cookies in accordance with their respective privacy policies to track qualifying purchases.
         </p>
 
-        <h3 className="text-base font-bold text-copy-primary">3. No Selling of Personal Information</h3>
+        <h3 className="text-base font-bold text-copy-primary">3. Google AdSense &amp; Advertising Cookies</h3>
+        <p>
+          We use Google AdSense to display advertisements. Google, as a third-party vendor, uses cookies (including advertising cookies) to serve ads to visitors based on their visit to this site and other sites on the internet. Visitors may opt out of personalized advertising by visiting{' '}
+          <a
+            href="https://adssettings.google.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-copy-primary"
+          >
+            Google Ads Settings
+          </a>
+          .
+        </p>
+
+        <h3 className="text-base font-bold text-copy-primary">4. No Selling of Personal Information</h3>
         <p>
           We do not sell, rent, or trade your personal information to third parties under any circumstances.
         </p>
 
-        <h3 className="text-base font-bold text-copy-primary">4. Data Security</h3>
+        <h3 className="text-base font-bold text-copy-primary">5. Data Security</h3>
         <p>
           We use industry-standard HTTPS encryption, secure database Row Level Security (RLS), and server-side secret isolation to ensure all visitor and account data remains protected.
         </p>
